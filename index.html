@@ -1,0 +1,1567 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>가상 실험실 · 기체의 온도와 부피 관계</title>
+<style>
+*{box-sizing:border-box}
+:root{
+  --bg:#e8ede9; --ink:#17242c; --muted:#5b6b74; --line:#d2dbd5; --panel:#fbfcfa;
+  --teal:#1f7a8c; --teal-d:#155866; --amber:#e07a2f; --ok:#2c8a57; --warn:#c4492a;
+  --bench:#2c3a43; --dye:#e03a5a;
+}
+html,body{margin:0;height:100%}
+body{font-family:"Pretendard","Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",system-ui,sans-serif;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased;line-height:1.45;overflow:hidden}
+html[lang="zh-CN"] body{font-family:"PingFang SC","Microsoft YaHei","Noto Sans SC","Noto Sans CJK SC","Source Han Sans SC",system-ui,sans-serif}
+html[lang="en"] body{font-family:"Segoe UI","Helvetica Neue",Arial,"Malgun Gothic",system-ui,sans-serif}
+/* 화면 전체 높이를 머리글·본문·아래 버튼으로 나눔 → 페이지 스크롤 없이 한 화면 */
+.app{height:100vh;height:100dvh;display:grid;grid-template-rows:auto minmax(0,1fr) auto}
+
+/* 머리글 (한 줄) */
+.top{background:var(--bench);color:#eef3f1;padding:8px 14px;display:flex;align-items:center;gap:12px;min-width:0}
+.badge{background:var(--amber);color:#fff;font-weight:800;padding:5px 9px;border-radius:8px;font-size:13px;white-space:nowrap;flex:0 0 auto}
+.ttl-wrap{flex:1 1 auto;min-width:0}
+.ttl-wrap h1{font-size:17px;margin:0;letter-spacing:-.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ttl-wrap p{margin:0;font-size:12px;color:#b5c5c2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.steps{list-style:none;display:flex;gap:5px;margin:0;padding:0;flex:0 0 auto}
+.steps li{display:flex;align-items:center;gap:6px;padding:3px;border-radius:999px;background:rgba(255,255,255,.07);font-size:13px;color:#9fb2af;border:1px solid transparent;user-select:none}
+.steps li .n{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;background:rgba(255,255,255,.12);font-weight:700;font-size:12px}
+.steps li .nm{display:none;white-space:nowrap}
+.steps li.done .n{background:var(--ok);color:#fff}
+.steps li.cur{background:#fff;color:var(--ink);font-weight:700;padding-right:11px}
+.steps li.cur .n{background:var(--amber);color:#fff}
+.steps li.cur .nm{display:inline}
+.steps li.can{cursor:pointer}
+.steps li.can:hover{border-color:rgba(255,255,255,.35)}
+.lang{display:flex;background:rgba(255,255,255,.08);border-radius:999px;padding:3px;gap:2px;flex:0 0 auto}
+.lang button{min-height:30px;padding:3px 10px;border-radius:999px;border:0;background:transparent;color:#cfdbd8;font-size:12.5px;font-weight:700}
+.lang button.on{background:#fff;color:var(--ink)}
+.lang button:hover:not(.on){background:rgba(255,255,255,.14)}
+
+/* 본문 */
+.main{min-height:0;overflow:auto;display:grid;grid-template-columns:minmax(0,1fr) 270px;gap:12px;padding:10px 14px}
+.stage{min-width:0;min-height:0;display:flex;flex-direction:column;gap:10px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 12px;min-width:0}
+.ch{margin:0 0 6px;font-size:15px;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.ch small{font-weight:500;color:var(--muted);font-size:12.5px}
+svg.scene{width:100%;height:auto;display:block;border-radius:10px}
+/* 남은 높이에 맞춰 늘었다 줄었다 하는 장면 */
+.grow{flex:1 1 0;min-height:210px;display:flex;flex-direction:column}
+.grow-row{flex:1 1 0;min-height:230px;display:flex;gap:10px}
+.col{display:flex;flex-direction:column;min-height:0}
+.scene-box{flex:1 1 0;min-height:0;position:relative}
+.scene-box>svg{position:absolute;inset:0;width:100%;height:100%;display:block;border-radius:10px}
+.row{display:flex;gap:10px}
+.row>.card{flex:1 1 0;min-width:0}
+
+/* 안내 패널 */
+.guide{min-height:0;overflow:auto;background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:8px}
+.g-left,.g-right{display:flex;flex-direction:column;gap:8px;min-width:0}
+.g-step{font-size:11px;font-weight:800;letter-spacing:.08em;color:var(--amber)}
+.guide h2{margin:0;font-size:18px;letter-spacing:-.02em;line-height:1.25}
+.g-lead{margin:0;color:var(--muted);font-size:13px}
+.tasks{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px}
+.tasks li{display:flex;gap:8px;align-items:flex-start;font-size:13.5px;padding:5px 8px;border-radius:8px;background:#f3f6f4;line-height:1.35}
+.tasks li::before{content:"";flex:0 0 16px;height:16px;margin-top:1px;border-radius:4px;border:2px solid #b9c6c0;background:#fff}
+.tasks li.done{background:#e5f3ea;color:#24533a}
+.tasks li.done::before{background:var(--ok) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3 8.5l3 3 7-7' stroke='white' stroke-width='2.4' fill='none' stroke-linecap='round'/%3E%3C/svg%3E") center/12px no-repeat;border-color:var(--ok)}
+.feedback{border-radius:9px;font-size:13.5px;font-weight:600;line-height:1.4}
+.feedback:empty{display:none}
+.feedback:not(:empty){padding:8px 10px}
+.feedback.ok{background:#e3f4ea;color:#1f6b42;border:1px solid #bfe2cd}
+.feedback.warn{background:#fdeee8;color:#9b3216;border:1px solid #f3c9b8}
+.feedback.info{background:#eef3f6;color:#2b4756;border:1px solid #d3e0e7}
+.safe-line{font-size:12.5px;background:#fff3ec;border:1px solid #f4d2bf;border-radius:8px;padding:6px 9px;color:#6e3a22;line-height:1.4}
+.safe-line b{color:var(--warn)}
+.help-tg{min-height:34px;font-size:13px;padding:4px 10px;background:#eef6f8;border-color:#cfe3e8;color:var(--teal-d);text-align:left}
+.help-box{display:flex;flex-direction:column;gap:6px}
+.help-box[hidden]{display:none}
+.note{border-radius:9px;padding:8px 10px;font-size:13px}
+.note .nt{display:block;font-size:12.5px;margin-bottom:2px;font-weight:800}
+.note.help{background:#eef6f8;border:1px solid #cfe3e8}
+.note.help .nt{color:var(--teal-d)}
+.redo{min-height:34px;font-size:13px;background:#f5f7f6}
+
+/* 아래 버튼 */
+.nav{background:rgba(251,252,250,.97);border-top:1px solid var(--line);padding:7px 14px;display:flex;gap:10px;align-items:center}
+.nav .hint{flex:1;text-align:right;color:var(--muted);font-size:13px}
+button{font:inherit;cursor:pointer;border-radius:10px;border:1px solid #c3cec8;background:#fff;color:var(--ink);padding:7px 14px;font-weight:600;min-height:40px;transition:background .15s,border-color .15s,transform .05s}
+button:hover:not(:disabled){border-color:#8ea39a}
+button:active:not(:disabled){transform:translateY(1px)}
+button.primary{background:var(--teal);border-color:var(--teal);color:#fff}
+button.primary:hover:not(:disabled){background:var(--teal-d)}
+button.warm{background:var(--amber);border-color:var(--amber);color:#fff}
+button:disabled{opacity:.42;cursor:not-allowed}
+button.sm{min-height:34px;padding:5px 11px;font-size:13.5px}
+
+/* 0단계 */
+.q-box{display:flex;flex-direction:column;gap:6px;overflow:auto}
+.q-main{background:var(--bench);color:#fff;border-radius:10px;padding:9px 12px;font-weight:700;font-size:15px}
+.q-main span{display:block;font-size:11px;color:#f3b88d;font-weight:800;letter-spacing:.06em}
+.q-line{padding:7px 10px;border-radius:9px;background:#f1f5f3;font-size:14px;transition:opacity .4s}
+.q-line>b{color:var(--teal-d);margin-right:6px}
+.q-line.hide{opacity:.3;filter:blur(1.5px)}
+.q-line.hyp{background:#fff7ef;border:1.5px solid #f0c9a6}
+.q-line.hyp.saved{background:#eef8f1;border-color:#bfe2cd}
+.hyp textarea{display:block;width:100%;margin:5px 0;padding:7px 9px;border:1.5px solid #d8c0a6;border-radius:8px;font:inherit;font-size:14px;resize:none;height:56px;background:#fff}
+.hyp textarea:focus{outline:none;border-color:var(--amber);box-shadow:0 0 0 3px rgba(224,122,47,.15)}
+.hyp-frame{font-size:12.5px;color:#7a6047;margin-bottom:6px}
+.hyp-text{display:block;margin:3px 0 6px;font-weight:600}
+.slots{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.slot{border:2px dashed #b8c7c0;border-radius:10px;padding:7px 9px;background:#fff;cursor:pointer;display:flex;flex-direction:column;gap:5px;transition:border-color .15s,background .15s}
+.slot.over,.slot.armed{border-color:var(--teal);background:#eef7f8}
+.slot.filled{border-style:solid;border-color:var(--ok);background:#effaf3;cursor:default}
+.slot-h b{display:block;font-size:14px}
+.slot-h span{font-size:12px;color:var(--muted)}
+.slot-drop{min-height:36px;display:grid;place-items:center;border-radius:7px;background:#f4f7f5;color:#99a8a2;font-size:12.5px;padding:4px;text-align:center}
+.slot.filled .slot-drop{background:var(--ok);color:#fff;font-weight:700;font-size:14px}
+.pool{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;min-height:40px}
+.vcard{padding:7px 12px;border-radius:9px;background:#fff7ef;border:2px solid #f0c9a6;font-weight:700;cursor:grab;user-select:none;min-height:40px;display:flex;align-items:center;font-size:14px}
+.vcard.sel{border-color:var(--amber);background:#ffe9d6;box-shadow:0 0 0 3px rgba(224,122,47,.2)}
+.shake{animation:shake .4s}
+@keyframes shake{20%,60%{transform:translateX(-6px)}40%,80%{transform:translateX(6px)}}
+
+/* 1단계 */
+.shelf{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:7px;padding:9px;border-radius:10px;background:#d8cab3;box-shadow:inset 0 -6px 0 #b9a68a}
+.item{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:6px 4px;background:#fffdf9;border:1px solid #e3d8c7;min-height:80px;font-size:12.5px;font-weight:600;line-height:1.2;text-align:center}
+.item svg{width:40px;height:40px}
+.item.gone{opacity:.28;pointer-events:none}
+.bench{min-height:96px;border-radius:10px;background:var(--bench);padding:8px;display:flex;flex-wrap:wrap;gap:6px;align-content:flex-start}
+.bench .bi{width:66px;display:flex;flex-direction:column;align-items:center;font-size:11.5px;color:#d6e2df;text-align:center;line-height:1.2}
+.bench .bi.new{animation:pop .35s}
+.bench .bi svg{width:42px;height:42px;background:#3a4a54;border-radius:9px;padding:3px}
+.bench .empty{color:#8ea3a6;font-size:13px}
+@keyframes pop{from{transform:scale(.4);opacity:0}to{transform:scale(1);opacity:1}}
+.ppe-wrap{display:flex;gap:10px;align-items:center}
+.ppe-wrap svg{width:110px;flex:0 0 110px}
+.ppe-btns{display:flex;flex-direction:column;gap:6px;flex:1}
+.ppe-btns button.on{background:#e5f3ea;border-color:var(--ok);color:#1f6b42}
+.layer{opacity:0;transition:opacity .35s}
+.layer.on{opacity:1}
+
+/* 2·3단계 */
+.ctrls{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px}
+.lab{font-size:13.5px;color:var(--muted);margin-right:4px}
+.hit{cursor:crosshair}
+.drag{cursor:ew-resize}
+.tapespot{cursor:pointer}
+.tapespot rect{animation:blink 1.2s infinite}
+@keyframes blink{50%{opacity:.35}}
+.range{display:flex;align-items:center;gap:10px;flex:1;min-width:200px}
+.range input{flex:1;accent-color:var(--teal);height:28px}
+.fall{transition:transform .9s cubic-bezier(.5,0,.8,.6),opacity .9s}
+
+/* 4단계 */
+.mix-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:8px}
+.mix{border:1px solid var(--line);border-radius:10px;padding:8px;background:#fff;display:flex;flex-direction:column;gap:4px}
+.mix h4{margin:0;font-size:14px;display:flex;justify-content:space-between;align-items:center;gap:4px;flex-wrap:wrap}
+.mix .amt{font-size:12.5px;color:var(--muted)}
+.mix .amt b{color:var(--ink)}
+.mix .amt .h{color:#c4492a}
+.mix .amt .c{color:#1f6ea0}
+.mix input{width:100%;accent-color:var(--amber)}
+.mix .feel{font-size:12px;font-weight:700}
+.steam path{animation:steam 2.4s infinite ease-in-out;opacity:0}
+.steam path:nth-child(2){animation-delay:.8s}
+.steam path:nth-child(3){animation-delay:1.6s}
+@keyframes steam{0%{opacity:0;transform:translateY(8px)}40%{opacity:.7}100%{opacity:0;transform:translateY(-22px)}}
+
+/* 5단계 */
+.meas{display:grid;grid-template-columns:170px minmax(0,1fr);gap:10px;align-items:stretch;flex:0 0 auto}
+.ttl{font-size:12.5px;font-weight:800;color:var(--muted)}
+.ttl span{font-weight:500}
+.mag svg{width:100%;height:auto;display:block;margin-top:4px}
+table.data{width:100%;border-collapse:collapse;font-size:14px}
+table.data th{background:#33424b;color:#fff;font-weight:700;padding:6px 4px;font-size:12.5px}
+table.data td{border-bottom:1px solid var(--line);padding:3px 4px;text-align:center}
+table.data tr.active td{background:#fff6ec}
+table.data tr.ok td{background:#eef8f1}
+table.data input{width:76px;padding:5px 6px;border:1.5px solid #bccac3;border-radius:7px;font:inherit;text-align:center}
+table.data input:focus{outline:none;border-color:var(--teal);box-shadow:0 0 0 3px rgba(31,122,140,.15)}
+table.data input:disabled{background:transparent;border-color:transparent;color:var(--ink);font-weight:700}
+.num{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:50%;background:var(--bench);color:#fff;font-weight:700;font-size:12.5px}
+.done-card{padding:8px 10px;border-radius:10px;background:#eaf6ef;border:1px solid #bfe2cd;font-size:13px}
+.done-card h3{margin:0 0 4px;color:#1f6b42;font-size:15px}
+.hyp-review{background:#fff;border:1.5px solid #f0c9a6;border-radius:8px;padding:6px 9px;margin:0 0 6px}
+.hyp-review b{display:block;font-size:12px;color:#a0561f}
+.scene-btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;align-items:center}
+.scene-btns span{font-size:13px;color:#5b6b74}
+
+/* 모달 */
+.modal{position:fixed;inset:0;background:rgba(18,28,34,.5);display:grid;place-items:center;z-index:50;padding:20px}
+.modal[hidden]{display:none}
+.modal-box{background:#fff;border-radius:16px;padding:22px;max-width:420px;width:100%;box-shadow:0 20px 50px rgba(0,0,0,.25)}
+.modal-box h3{margin:0 0 6px}
+.modal-box p{margin:0 0 16px;color:var(--muted)}
+.modal-btns{display:flex;flex-direction:column;gap:8px}
+#printArea{display:none}
+
+/* 좁은 화면: 머리글 줄이기 */
+@media (max-width:1100px){.ttl-wrap p{display:none}}
+@media (max-width:860px){.badge{display:none}.ttl-wrap h1{font-size:15px}}
+/* 세로 화면(태블릿 세로 등): 안내 패널을 장면 위 얇은 띠로 */
+@media (max-width:900px){
+  .main{grid-template-columns:1fr;grid-template-rows:auto minmax(0,1fr)}
+  .guide{order:-1;display:grid;grid-template-columns:1.15fr 1fr;gap:8px 14px;overflow:visible;padding:10px 12px}
+  .guide h2{font-size:17px}
+  .tasks li{padding:4px 8px;font-size:13px}
+}
+@media (max-width:620px){
+  .guide{grid-template-columns:1fr}
+  .grow-row{flex-direction:column}
+  .slots{grid-template-columns:1fr}
+  .mix-grid{grid-template-columns:repeat(2,1fr)}
+  .meas{grid-template-columns:1fr}
+  .row{flex-direction:column}
+  .steps li.cur .nm{display:none}
+  .steps li.cur{padding-right:3px}
+  .nav .hint{display:none}
+}
+@media print{
+  html,body{height:auto;overflow:visible}
+  body>*:not(#printArea){display:none!important}
+  #printArea{display:block!important;padding:20px;font-size:14px}
+  #printArea table{border-collapse:collapse;width:70%}
+  #printArea th,#printArea td{border:1px solid #333;padding:8px;text-align:center}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div class="badge" id="hBadge"></div>
+    <div class="ttl-wrap"><h1 id="hTitle"></h1><p id="hSub"></p></div>
+    <ol class="steps" id="steps"></ol>
+    <div class="lang" role="group" aria-label="Language / 언어 / 语言">
+      <button data-lang="ko">한국어</button>
+      <button data-lang="en">English</button>
+      <button data-lang="zh">中文</button>
+    </div>
+  </header>
+  <main class="main">
+    <section class="stage" id="stage"></section>
+    <aside class="guide" id="guide"></aside>
+  </main>
+  <nav class="nav">
+    <button id="btnPrev"></button>
+    <button id="btnHome"></button>
+    <span class="hint" id="navHint"></span>
+    <button id="btnNext" class="primary"></button>
+  </nav>
+</div>
+
+<div class="modal" id="modal" hidden>
+  <div class="modal-box" role="dialog" aria-modal="true">
+    <h3 id="mTitle"></h3>
+    <p id="mText"></p>
+    <div class="modal-btns" id="mBtns"></div>
+  </div>
+</div>
+<div id="printArea"></div>
+
+<script>
+/* =====================================================================
+   번역 사전 (ko: 한국어 / en: English / zh: 简体中文)
+   ===================================================================== */
+const L = {
+ko:{
+  docTitle:'가상 실험실 · 기체의 온도와 부피 관계',
+  badge:'탐구 ①', title:'기체의 온도와 부피는 어떤 관계일까?', sub:'1학년 Ⅵ. 기체의 성질 · 가상 실험실 (교과서 210쪽)',
+  steps:['탐구 시작','준비물·안전','스포이트 만들기','물방울 넣기','온도가 다른 물','측정·기록'],
+  prev:'◀ 이전', home:'⟲ 처음으로', next:'다음 ▶',
+  hintDoneLast:'측정을 모두 마쳤어요. 결과를 활동지에 옮겨 적어요.', hintLast:'비커 4개를 모두 측정해요.',
+  hintDone:'잘했어요! 다음 단계로 가요.', hintTodo:'이 단계를 마치면 [다음]이 켜져요.',
+  redo:'↺ 이 단계 다시 하기', redoTitle:'이 단계를 다시 할까요?', redoText:'이 단계를 바꾸면 뒤 단계의 기록도 함께 지워져요.', redoYes:'다시 하기', cancel:'취소',
+  homeTitle:'처음으로 갈까요?', homeText:'기록을 그대로 두고 첫 화면으로 가거나, 모두 지우고 새로 시작할 수 있어요.',
+  homeKeep:'첫 화면으로 가기 (기록 유지)', homeReset:'모두 지우고 새로 시작',
+  helpT:'활동 도우미', safeT:'⚠ 안전', helpShow:'💡 도움말 보기', helpHide:'💡 도움말 접기',
+  /* 0 */
+  s0obs:'관찰하기', s0obsSub:'여름날, 물이 조금 남은 생수병을 냉장고에 넣으면?', fridgeTemp:'약 4 ℃', laterTxt:'⏱ 몇 시간 후…',
+  btnFridge:'생수병을 냉장고에 넣어 보기', btnReplay:'다시 보기',
+  qLabel:'탐구 질문', q:'냉장고 안에 넣어 둔 생수병은 왜 찌그러졌을까?',
+  probL:'문제인식', prob:'기체의 온도에 따라 기체의 부피는 어떻게 변할까?',
+  hypL:'가설설정', hypPh:'나의 가설을 적어 보세요.', hypFrame:'문장 틀: 기체의 온도가 (　　)할수록 기체의 부피는 (　　)할 것이다.',
+  hypSave:'가설 저장', hypEdit:'고치기', hypLocked:'먼저 생수병을 냉장고에 넣어 관찰해요.',
+  plan:'스포이트 속에 공기를 가두고, 온도가 다른 물에 넣어 공기의 부피가 어떻게 변하는지 알아봐요.',
+  varTitle:'변인 정하기', varSub:'카드를 끌어다 놓거나, 카드를 누른 다음 칸을 눌러요',
+  slot_m:'① 조작 변인', slot_ms:'조작해 줄 조건', slot_d:'② 종속 변인', slot_ds:'결과로 관찰할 조건', slot_c:'③ 통제 변인', slot_cs:'동일하게 통제할 조건', dropHere:'여기에 놓기',
+  var_temp:'기체의 온도', var_vol:'스포이트 속 기체의 부피', var_pres:'기체의 압력 등',
+  fbFridge:'생수병이 찌그러졌어요! 병 속 공기에 무슨 일이 생긴 걸까요? 나의 가설을 적고, 아래에서 변인을 정해요.',
+  fbVarOk:s=>({m:'맞아요! 실험자가 일부러 바꾸는 조건은 기체의 온도예요.',d:'맞아요! 온도를 바꾸었을 때 달라지는 스포이트 속 기체의 부피를 관찰해요.',c:'맞아요! 기체의 압력처럼 결과에 영향을 줄 수 있는 조건은 똑같이 유지해요.'})[s],
+  fbVarNo:s=>'다시 생각해 봐요. '+({m:'조작 변인은 실험자가 <u>일부러 바꾸는</u> 조건이에요.',d:'종속 변인은 조작 변인을 바꾼 <u>결과로 달라져서 측정하는</u> 것이에요.',c:'통제 변인은 실험하는 동안 <u>똑같이 유지하는</u> 조건이에요.'})[s],
+  fbHypShort:'가설을 조금 더 자세히 적어요. 기체의 온도와 부피가 어떻게 될지 함께 적어야 해요.',
+  fbHypNeed:'가설에 <b>온도</b>와 <b>부피</b>라는 말이 모두 들어가게 적어요. 문장 틀을 참고해요.',
+  fbHypOk:'가설을 저장했어요! 실험이 끝나면 내 가설과 결과를 비교해 봐요.',
+  fbS0Done:'탐구 시작 완료! 이제 실험을 준비해요. [다음 ▶]을 눌러요.',
+  g0lead:'냉장고 속 생수병이 찌그러지는 까닭을 실험으로 알아봐요.',
+  g0t1:'생수병을 냉장고에 넣고 관찰하기', g0t2:'나의 가설 적고 저장하기', g0t3:n=>`변인 카드를 알맞은 칸에 놓기 (${n}/3)`,
+  g0hT:'가설 쓰기 도우미', g0h:'가설은 탐구 질문에 대한 나의 예상 답이에요. 원인(기체의 온도)과 결과(기체의 부피)가 함께 드러나게 적어요.',
+  g0nT:'변인이란?', g0n:'<b>조작 변인</b>: 일부러 바꾸는 조건<br><b>종속 변인</b>: 그 결과로 달라져서 측정하는 것<br><b>통제 변인</b>: 똑같이 유지하는 조건',
+  /* 1 */
+  shelf:'준비물 선반', shelfSub:'이번 실험에 필요한 것만 골라 실험대로 옮겨요', bench:'나의 실험대', benchEmpty:'아직 아무것도 없어요. 선반에서 준비물을 눌러요.', ppeTitle:'안전 장비 착용', personAria:'안전 장비를 착용한 학생',
+  it_dropper:'1 mL 스포이트 2개', it_dye:'식용 색소', it_beaker:'250 mL 비커 4개', it_thermo:'온도계', it_ruler:'자', it_scissors:'가위', it_tape:'셀로판테이프', it_cold:'찬물', it_hot:'뜨거운 물', it_lamp:'알코올램프', it_magnet:'자석', it_scale:'전자저울',
+  why_lamp:'이번 실험은 불을 쓰지 않아요. 찬물과 뜨거운 물을 섞어서 온도를 맞춰요.', why_magnet:'자석은 기체의 온도와 부피 실험에 쓰이지 않아요.', why_scale:'이번 실험에서는 질량을 재지 않아요. 물의 양은 비커 눈금으로 맞춰요.',
+  ppe_coat:'실험복', ppe_goggles:'보안경', ppe_glove:'실험용 장갑', ppe_heat:'내열 장갑',
+  fbGot:n=>`${n} 준비 완료!`, fbNo:(n,w)=>`${n}: 이번 실험에는 필요 없어요. ${w}`, fbPpeOn:n=>`${n} 착용!`, fbPpeOff:'안전 장비를 벗었어요. 실험할 때는 꼭 착용해요.',
+  fbS1Done:'준비 완료! 안전 장비도 모두 착용했어요. [다음 ▶]을 눌러요.',
+  g1lead:'실험에 필요한 준비물을 챙기고 안전 장비를 착용해요.', g1t1:(a,b)=>`필요한 준비물 모두 옮기기 (${a}/${b})`, g1t2:(a,b)=>`안전 장비 착용하기 (${a}/${b})`,
+  g1safe:'유리 기구를 다룰 때 깨지지 않게 조심해요.<br>뜨거운 물을 사용할 때 화상을 입지 않도록 주의해요.',
+  /* 2 */
+  s2cutT:'① 스포이트 자르기', s2cutS:'가위로 뾰족한 끝에서 2 cm 되는 곳을 눌러 잘라요',
+  s2alT:'② 영점 맞추기', s2alS:'스포이트를 좌우로 끌어서 둥근 끝을 자의 0에 맞춰요',
+  s2tpT:'③ 테이프 붙이기', s2tpS:'깜박이는 두 곳을 눌러 셀로판테이프를 붙여요',
+  s2dnT:'스포이트 준비 완료', s2dnS:'둥근 끝이 자의 영점에 맞게 붙었어요',
+  bulb:'둥근 부분', tip:'뾰족한 끝', fromTip:'스포이트 끝에서부터의 길이 (cm)', cutLbl:d=>`끝에서 ${d} cm`, snip:'싹둑! ✂',
+  cutHint:'💡 가위를 스포이트 위에 올리면 끝에서부터의 길이가 보여요.',
+  fbCutOk:'잘랐어요! 뾰족한 끝 2 cm를 잘라냈어요. 이제 둥근 끝을 자의 영점에 맞춰요.',
+  fbCutNo:d=>`지금은 끝에서 약 ${d} cm 위치예요. 아래 눈금을 보고 <b>2 cm</b> 되는 곳을 잘라요.`,
+  magZero:'🔍 영점 부분 확대', zeroOk:'영점 맞춤 ✓', taped:'스포이트를 자에 단단히 붙였어요 ✓', nudge:'조금씩 옮기기',
+  tapeHint:'테이프를 붙이는 동안 스포이트가 움직이지 않게 해요.',
+  fbAlignOk:'영점 맞춤 완료! 둥근 끝이 자의 0에 딱 맞았어요.',
+  fbAlignNo:r=>r?'돋보기를 보세요. 둥근 끝이 0보다 오른쪽에 있어요. 스포이트를 <b>왼쪽</b>으로 옮겨요.':'돋보기를 보세요. 둥근 끝이 0보다 왼쪽에 있어요. 스포이트를 <b>오른쪽</b>으로 옮겨요.',
+  fbTape1:'한 곳을 붙였어요. 나머지 한 곳도 붙여요.', fbS2Done:'스포이트를 자에 붙였어요! [다음 ▶]을 눌러 물방울을 넣어요.',
+  g2lead:'스포이트 끝을 잘라내고, 자에 붙여서 물방울의 위치를 잴 수 있게 만들어요.',
+  g2t1:'스포이트의 뾰족한 끝을 2 cm 잘라내기', g2t2:'둥근 끝을 자의 영점(0)에 맞추기', g2t3:'셀로판테이프로 스포이트를 자에 붙이기',
+  g2help:'스포이트의 둥근 부분 끝을 자의 0에 맞춰야 물방울의 위치를 정확하게 잴 수 있어요.', g2safe:'가위를 사용할 때 손을 다치지 않게 조심해요.',
+  /* 3 */
+  s3t1:'① 색소 물 빨아들이기', s3s1:'아래 [색소 물 빨아들이기]를 눌러요',
+  s3t2:'② 스포이트를 안쪽까지 넣고 1방울 넣기', s3s2:'깊이 막대를 끝까지 밀어 보세요',
+  s3t3:'물방울 넣기 완료', s3s3:'물방울이 공기를 가두었어요', s3t4:'다시 넣어 보세요', s3s4:'물방울이 입구 쪽에 너무 가까워요',
+  stuck:'더 이상 들어가지 않아요 (스포이트 끝이 걸려요)', dyePrep:'색소 물 준비', dyeWater:'식용 색소를 탄 물',
+  btnFill:'색소 물 빨아들이기', filledBtn:'✓ 빨아들임', dropTitle:'물방울 넣기', depthL:'스포이트를 넣는 깊이',
+  btnDrop:'💧 꾹 눌러 1방울 넣기', btnRetry:'물방울 털어내고 다시 넣기',
+  s3info:'물방울을 넣으면 스포이트의 둥근 부분과 물방울 사이에 <b>공기가 갇혀요.</b> 물방울은 이 공기의 부피를 알려 주는 표시가 돼요.',
+  airLbl:'갇힌 공기 (관찰 대상)', dropLbl:'물방울',
+  fbRetry:'물방울을 털어냈어요. 이번에는 스포이트를 최대한 안쪽까지 넣어요.',
+  fbFilled:'색소 물을 빨아들였어요. 이제 위 그림의 스포이트를 안쪽으로 밀어 넣어요.',
+  fbDropOk:'물방울이 스포이트 안쪽에 잘 들어갔어요! 이제 공기가 갇혔어요. [다음 ▶]을 눌러요.',
+  fbDropFar:'물방울이 입구 쪽에 너무 가까워요. 뜨거운 물에 넣으면 공기가 늘어나 물방울이 밖으로 밀려날 수 있어요. [물방울 털어내고 다시 넣기]를 누르고, 이번에는 <b>최대한 안쪽까지</b> 넣어요.',
+  g3lead:'자에 붙인 스포이트에 색소 물을 1방울 넣어 공기를 가둬요.',
+  g3t1:'다른 스포이트로 색소 물 빨아들이기', g3t2:'스포이트를 최대한 안쪽까지 넣기', g3t3:'색소 물을 1방울 넣기',
+  g3help:'잘라 낸 스포이트에 식용 색소를 탄 물의 물방울을 넣을 때에는 스포이트의 최대한 안쪽에 들어가도록 해요.',
+  /* 4 */
+  s4T:'온도가 다른 물 4개 만들기', s4S:'찬물과 뜨거운 물을 섞어 비커마다 150 mL씩 담아요',
+  cold:'찬물', hot:'뜨거운 물', burn:'⚠ 화상 주의', beakerN:i=>`비커 ${i}`, pour:'붓기', dump:'버리고 다시', check4:'비커 4개 점검하기',
+  feelPre:'손등으로: ', feel:['❄ 아주 차가워요','차가워요','미지근해요','따뜻해요','뜨거워요'], ariaHot:i=>`비커 ${i} 뜨거운 물의 양`,
+  fbDump:(i,h)=>`비커 ${i}의 물을 버렸어요.`+(h?' 물의 온도가 바뀌어서 측정 기록도 지워졌어요.':''),
+  fbPour:i=>`비커 ${i}에 물 150 mL를 부었어요. 정확한 온도는 측정 단계에서 온도계로 재요.`,
+  fb4Hot:i=>`비커 ${i}의 물이 너무 뜨거워요. 화상 위험이 있고, 스포이트 속 물방울이 밖으로 밀려날 수 있어요. 버리고 찬물을 더 넣어요.`,
+  fb4Order:i=>`비커 ${i}이(가) 비커 ${i-1}보다 따뜻하지 않아요. 번호가 커질수록 뜨거운 물을 더 많이 넣어 점점 따뜻하게 만들어요.`,
+  fb4Gap:i=>`비커 ${i-1}과(와) 비커 ${i}의 온도가 너무 비슷해요. 뜨거운 물의 양 차이를 더 크게 해 봐요.`,
+  fbS4Done:'좋아요! 온도가 서로 다른 물 4개가 준비되었어요. [다음 ▶]을 눌러 측정해요.',
+  g4lead:'찬물과 뜨거운 물을 섞어 온도가 다른 물을 4개 만들고, 비커에 150 mL씩 넣어요.',
+  g4t1:n=>`비커 4개에 물을 150 mL씩 붓기 (${n}/4)`, g4t2:'번호가 커질수록 따뜻하게 만들기 (점검 통과)',
+  g4help:'비커 1은 찬물을 많이, 비커 4는 뜨거운 물을 많이 넣어요. 비커끼리 뜨거운 물의 양을 20~30 mL 이상씩 다르게 하면 온도 차이가 뚜렷해져요.',
+  g4safe:'뜨거운 물을 사용할 때 화상을 입지 않도록 내열 장갑을 껴요.',
+  /* 5 */
+  s5T:'측정하기', s5S:'온도가 낮은 비커부터 차례대로 넣어 물의 온도와 물방울의 위치를 재요',
+  roomT:'실험실 온도', rulesT:'⚠ 실험 안전 수칙', rule1:'· 유리 기구가 깨지지 않게 조심해요', rule2:'· 뜨거운 물에 화상을 입지 않게 해요',
+  thermo:'🌡 디지털 온도계', inAir:'공기 중', changing:'온도가 변하는 중…', stableTxt:'숫자가 멈췄어요', readWhen:'숫자가 더 이상 변하지 않을 때 읽어요.',
+  mag:'🔍 돋보기 (자 눈금 확대)', bottom:'맨 아래쪽!', tableT:'📋 실험 결과 기록표',
+  thNo:'비커 번호', thT:'물의 온도(℃)', thX:'물방울의 위치(cm)', decimal:'소수 첫째 자리까지 적어요. (예: 23.7)', rec:'기록',
+  ariaT:i=>`비커 ${i} 물의 온도`, ariaX:i=>`비커 ${i} 물방울의 위치`,
+  btnIn:i=>`⬇ 비커 ${i}에 넣기`, btnOut:i=>`⬆ 비커 ${i}에서 꺼내기`, btnOutAll:'스포이트 꺼내기', measDone:'측정 완료!', allDone:'비커 4개 측정을 모두 마쳤어요 ✓',
+  inHint:'온도가 가장 낮은 비커 1부터 차례대로 측정해요.', outHint:'온도계 숫자가 멈추면 온도와 물방울의 위치를 읽어 표에 적어요.',
+  fbIn:i=>`비커 ${i}에 넣었어요. 온도계 숫자가 멈출 때까지 기다려요.`,
+  fbNotStable:'아직 온도계 숫자가 변하고 있어요. 숫자가 멈출 때까지 기다린 다음 읽어요.',
+  fbNaN:'물의 온도와 물방울의 위치를 모두 숫자로 적어요.',
+  fbRecAll:'비커 4개 측정을 모두 마쳤어요! 아래 결과를 활동지 표에 옮겨 적어요.',
+  fbRec:i=>`비커 ${i} 기록 완료! 스포이트를 꺼내 비커 ${i+1}로 옮겨요.`,
+  fbBadT:'온도계 화면의 숫자를 다시 확인해요.',
+  fbBadX:'물방울의 <b>맨 아래쪽</b>이 자의 어느 눈금에 있는지 돋보기로 다시 읽어요. 작은 눈금 한 칸은 0.1 cm예요.',
+  fbBadX2:'돋보기의 빨간 점선(물방울 맨 아래쪽)이 가리키는 눈금을 읽어요.',
+  doneT:'🎉 측정 완료!', doneP:'기록한 값을 활동지 표에 옮겨 적고, 가로축은 물의 온도, 세로축은 물방울의 위치로 하여 그래프를 그려 보세요.',
+  myHyp:'나의 가설', compare:'실험 결과가 내 가설과 맞는지 비교해 보세요.',
+  copy:'결과 복사하기', print:'결과 인쇄하기', copied:'복사했어요! 스프레드시트에 붙여 넣을 수 있어요.',
+  printTitle:'기체의 온도와 부피 관계 - 가상 실험 결과', printName:'1학년 (　　)반 (　　)번 이름: (　　　　　　)',
+  g5lead:'온도가 낮은 비커부터 차례대로 스포이트와 온도계를 넣고, 물의 온도와 물방울의 위치를 재어 기록해요.',
+  g5t:i=>`비커 ${i} 측정하고 기록하기`, g5orderT:'측정 순서',
+  g5order:'① 비커에 넣기 → ② 온도계 숫자가 멈출 때까지 기다리기 → ③ 돋보기로 물방울 위치 읽기 → ④ 표에 기록 → ⑤ 꺼내서 다음 비커로',
+  g5help:'물방울의 위치를 측정할 때에는 물방울의 <b>맨 아래쪽</b>을 기준으로 위치를 측정해요.',
+  g5safe:'유리 기구를 다룰 때 깨지지 않게 조심하고, 뜨거운 물에 화상을 입지 않도록 주의해요.'
+},
+
+en:{
+  docTitle:'Virtual Lab · Temperature and Volume of a Gas',
+  badge:'Inquiry ①', title:'How are the temperature and volume of a gas related?', sub:'Grade 7 · Unit VI. Properties of Gases · Virtual Lab (Textbook p. 210)',
+  steps:['Get Started','Materials & Safety','Prepare the Dropper','Add a Water Drop','Water at Different Temps','Measure & Record'],
+  prev:'◀ Back', home:'⟲ Start Over', next:'Next ▶',
+  hintDoneLast:'All measurements done. Copy your results onto the worksheet.', hintLast:'Measure all 4 beakers.',
+  hintDone:'Great job! Go to the next step.', hintTodo:'Finish this step to unlock [Next].',
+  redo:'↺ Redo this step', redoTitle:'Redo this step?', redoText:'If you change this step, the records in later steps will also be erased.', redoYes:'Redo', cancel:'Cancel',
+  homeTitle:'Go back to the start?', homeText:'You can go to the first screen and keep your records, or erase everything and start fresh.',
+  homeKeep:'Go to first screen (keep records)', homeReset:'Erase everything and start over',
+  helpT:'Lab Tip', safeT:'⚠ Safety', helpShow:'💡 Show tips', helpHide:'💡 Hide tips',
+  /* 0 */
+  s0obs:'Observe', s0obsSub:'On a hot day, what happens to a water bottle with a little water left in it when you put it in the fridge?', fridgeTemp:'about 4 ℃', laterTxt:'⏱ A few hours later…',
+  btnFridge:'Put the bottle in the fridge', btnReplay:'Watch again',
+  qLabel:'INQUIRY QUESTION', q:'Why did the water bottle in the fridge get crushed?',
+  probL:'Question', prob:'How does the volume of a gas change with its temperature?',
+  hypL:'Hypothesis', hypPh:'Write your hypothesis here.', hypFrame:'Sentence frame: "As the temperature of a gas (　　), its volume will (　　)."',
+  hypSave:'Save hypothesis', hypEdit:'Edit', hypLocked:'First, put the bottle in the fridge and observe.',
+  plan:'We will trap air inside a dropper, put it in water at different temperatures, and see how the volume of the air changes.',
+  varTitle:'Identify the Variables', varSub:'Drag a card into a box, or tap a card and then tap a box',
+  slot_m:'① Independent variable', slot_ms:'The condition you change', slot_d:'② Dependent variable', slot_ds:'The result you observe', slot_c:'③ Controlled variable', slot_cs:'Conditions you keep the same', dropHere:'Drop here',
+  var_temp:'Temperature of the gas', var_vol:'Volume of the gas in the dropper', var_pres:'Pressure of the gas, etc.',
+  fbFridge:'The bottle got crushed! What happened to the air inside? Write your hypothesis, then identify the variables below.',
+  fbVarOk:s=>({m:'Correct! The condition you change on purpose is the temperature of the gas.',d:'Correct! You observe how the volume of the gas in the dropper changes when the temperature changes.',c:'Correct! Conditions that could affect the result, like the pressure of the gas, are kept the same.'})[s],
+  fbVarNo:s=>'Think again. '+({m:'The independent variable is the condition you <u>change on purpose</u>.',d:'The dependent variable is what you <u>measure because it changes as a result</u>.',c:'Controlled variables are conditions you <u>keep the same</u> during the experiment.'})[s],
+  fbHypShort:'Write your hypothesis in a bit more detail. Say what happens to both the temperature and the volume of the gas.',
+  fbHypNeed:'Make sure your hypothesis includes both words <b>temperature</b> and <b>volume</b>. Use the sentence frame.',
+  fbHypOk:'Hypothesis saved! After the experiment, compare your hypothesis with your results.',
+  fbS0Done:'Getting started is complete! Now let\'s prepare the experiment. Press [Next ▶].',
+  g0lead:'Let\'s find out by experiment why the water bottle in the fridge got crushed.',
+  g0t1:'Put the bottle in the fridge and observe', g0t2:'Write and save your hypothesis', g0t3:n=>`Place the variable cards in the right boxes (${n}/3)`,
+  g0hT:'Writing a hypothesis', g0h:'A hypothesis is your predicted answer to the inquiry question. Show both the cause (temperature of the gas) and the effect (volume of the gas).',
+  g0nT:'What are variables?', g0n:'<b>Independent variable</b>: the condition you change on purpose<br><b>Dependent variable</b>: what changes as a result and is measured<br><b>Controlled variable</b>: conditions kept the same',
+  /* 1 */
+  shelf:'Supply Shelf', shelfSub:'Choose only what this experiment needs and move it to your bench', bench:'My Lab Bench', benchEmpty:'Nothing here yet. Tap the materials on the shelf.', ppeTitle:'Put On Safety Gear', personAria:'Student wearing safety gear',
+  it_dropper:'1 mL dropper ×2', it_dye:'Food coloring', it_beaker:'250 mL beaker ×4', it_thermo:'Thermometer', it_ruler:'Ruler', it_scissors:'Scissors', it_tape:'Clear tape', it_cold:'Cold water', it_hot:'Hot water', it_lamp:'Alcohol lamp', it_magnet:'Magnet', it_scale:'Electronic scale',
+  why_lamp:'This experiment does not use fire. We mix cold and hot water to set the temperature.', why_magnet:'A magnet is not used in the gas temperature and volume experiment.', why_scale:'We do not measure mass in this experiment. The amount of water is measured with the beaker scale.',
+  ppe_coat:'Lab coat', ppe_goggles:'Safety goggles', ppe_glove:'Lab gloves', ppe_heat:'Heat-resistant gloves',
+  fbGot:n=>`${n} added to your bench!`, fbNo:(n,w)=>`${n}: not needed for this experiment. ${w}`, fbPpeOn:n=>`${n} on!`, fbPpeOff:'You took off safety gear. Always wear it during experiments.',
+  fbS1Done:'All set! You are wearing all your safety gear. Press [Next ▶].',
+  g1lead:'Gather the materials and put on your safety gear.', g1t1:(a,b)=>`Move all needed materials (${a}/${b})`, g1t2:(a,b)=>`Put on safety gear (${a}/${b})`,
+  g1safe:'Handle glassware carefully so it does not break.<br>Be careful not to get burned when using hot water.',
+  /* 2 */
+  s2cutT:'① Cut the dropper', s2cutS:'Tap with the scissors 2 cm from the pointed tip to cut it',
+  s2alT:'② Line up the zero point', s2alS:'Drag the dropper left or right so the round end lines up with 0 on the ruler',
+  s2tpT:'③ Tape it down', s2tpS:'Tap the two blinking spots to attach clear tape',
+  s2dnT:'Dropper ready', s2dnS:'The round end is lined up with the zero point',
+  bulb:'Round bulb', tip:'Pointed tip', fromTip:'Distance from the tip (cm)', cutLbl:d=>`${d} cm from tip`, snip:'Snip! ✂',
+  cutHint:'💡 Hover the scissors over the dropper to see the distance from the tip.',
+  fbCutOk:'Cut! You removed 2 cm of the pointed tip. Now line up the round end with the zero point of the ruler.',
+  fbCutNo:d=>`That spot is about ${d} cm from the tip. Use the scale below and cut at <b>2 cm</b>.`,
+  magZero:'🔍 Zero point (zoomed)', zeroOk:'Lined up ✓', taped:'The dropper is firmly taped to the ruler ✓', nudge:'Move a little',
+  tapeHint:'Keep the dropper from moving while you tape it.',
+  fbAlignOk:'Lined up! The round end is exactly at 0 on the ruler.',
+  fbAlignNo:r=>r?'Look at the magnifier. The round end is to the right of 0. Move the dropper to the <b>left</b>.':'Look at the magnifier. The round end is to the left of 0. Move the dropper to the <b>right</b>.',
+  fbTape1:'One piece done. Tape the other spot too.', fbS2Done:'The dropper is taped to the ruler! Press [Next ▶] to add a water drop.',
+  g2lead:'Cut the tip of the dropper and attach it to a ruler so you can measure the position of the water drop.',
+  g2t1:'Cut 2 cm off the pointed tip', g2t2:'Line up the round end with 0 on the ruler', g2t3:'Tape the dropper to the ruler',
+  g2help:'The round end of the dropper must be at 0 on the ruler so you can measure the drop position accurately.', g2safe:'Be careful not to hurt your hands with the scissors.',
+  /* 3 */
+  s3t1:'① Draw up colored water', s3s1:'Press [Draw up colored water] below',
+  s3t2:'② Push the dropper in deep and add 1 drop', s3s2:'Slide the depth bar all the way',
+  s3t3:'Water drop added', s3s3:'The drop has trapped the air', s3t4:'Try again', s3s4:'The drop is too close to the opening',
+  stuck:'It won\'t go in any further (the tip gets stuck)', dyePrep:'Prepare Colored Water', dyeWater:'Water with food coloring',
+  btnFill:'Draw up colored water', filledBtn:'✓ Drawn up', dropTitle:'Add a Water Drop', depthL:'How deep to insert',
+  btnDrop:'💧 Squeeze out 1 drop', btnRetry:'Shake out the drop and try again',
+  s3info:'When you add the drop, <b>air gets trapped</b> between the round bulb and the drop. The drop becomes a marker that shows the volume of this air.',
+  airLbl:'Trapped air (what we observe)', dropLbl:'Water drop',
+  fbRetry:'You shook out the drop. This time, push the dropper in as deep as it will go.',
+  fbFilled:'You drew up the colored water. Now push the dropper in the picture above inward.',
+  fbDropOk:'The drop went deep inside! The air is now trapped. Press [Next ▶].',
+  fbDropFar:'The drop is too close to the opening. In hot water the air will expand and could push the drop out. Press [Shake out the drop and try again], and this time push it in <b>as deep as it will go</b>.',
+  g3lead:'Add one drop of colored water to the taped dropper to trap the air.',
+  g3t1:'Draw up colored water with the other dropper', g3t2:'Push the dropper in as deep as possible', g3t3:'Add 1 drop of colored water',
+  g3help:'When adding the drop of colored water to the cut dropper, make sure it goes in as deep as possible.',
+  /* 4 */
+  s4T:'Make 4 Beakers of Water at Different Temperatures', s4S:'Mix cold and hot water and put 150 mL in each beaker',
+  cold:'Cold water', hot:'Hot water', burn:'⚠ Hot! Burn risk', beakerN:i=>`Beaker ${i}`, pour:'Pour', dump:'Empty & redo', check4:'Check the 4 beakers',
+  feelPre:'Back of hand: ', feel:['❄ Very cold','Cold','Lukewarm','Warm','Hot'], ariaHot:i=>`Beaker ${i} amount of hot water`,
+  fbDump:(i,h)=>`You emptied beaker ${i}.`+(h?' The water temperature changed, so your measurements were erased.':''),
+  fbPour:i=>`You poured 150 mL of water into beaker ${i}. You will measure the exact temperature with a thermometer in the next step.`,
+  fb4Hot:i=>`The water in beaker ${i} is too hot. It could burn you, and it could push the drop out of the dropper. Empty it and add more cold water.`,
+  fb4Order:i=>`Beaker ${i} is not warmer than beaker ${i-1}. Add more hot water as the beaker number goes up so each one is warmer.`,
+  fb4Gap:i=>`Beakers ${i-1} and ${i} are too close in temperature. Make a bigger difference in the amount of hot water.`,
+  fbS4Done:'Great! You have 4 beakers of water at different temperatures. Press [Next ▶] to measure.',
+  g4lead:'Mix cold and hot water to make water at 4 different temperatures, with 150 mL in each beaker.',
+  g4t1:n=>`Pour 150 mL into each of the 4 beakers (${n}/4)`, g4t2:'Make each beaker warmer as the number goes up (passed check)',
+  g4help:'Use mostly cold water for beaker 1 and mostly hot water for beaker 4. Changing the hot water by at least 20–30 mL between beakers makes the temperature difference clear.',
+  g4safe:'Wear heat-resistant gloves so you do not get burned by hot water.',
+  /* 5 */
+  s5T:'Measure', s5S:'Starting with the coldest beaker, measure the water temperature and the drop position in order',
+  roomT:'Room temp', rulesT:'⚠ Lab Safety Rules', rule1:'· Handle glassware with care', rule2:'· Watch out for hot-water burns',
+  thermo:'🌡 Digital thermometer', inAir:'In the air', changing:'Temperature changing…', stableTxt:'Number has stopped', readWhen:'Read it when the number stops changing.',
+  mag:'🔍 Magnifier (ruler scale)', bottom:'Bottom edge!', tableT:'📋 Results Table',
+  thNo:'Beaker No.', thT:'Water temp (℃)', thX:'Drop position (cm)', decimal:'Write to one decimal place (e.g., 23.7).', rec:'Record',
+  ariaT:i=>`Beaker ${i} water temperature`, ariaX:i=>`Beaker ${i} drop position`,
+  btnIn:i=>`⬇ Put into beaker ${i}`, btnOut:i=>`⬆ Take out of beaker ${i}`, btnOutAll:'Take out the dropper', measDone:'Measurement complete!', allDone:'All 4 beakers measured ✓',
+  inHint:'Measure in order, starting with beaker 1 (the coldest).', outHint:'When the thermometer stops changing, read the temperature and the drop position and write them in the table.',
+  fbIn:i=>`Placed in beaker ${i}. Wait until the thermometer number stops changing.`,
+  fbNotStable:'The thermometer number is still changing. Wait until it stops, then read it.',
+  fbNaN:'Write both the water temperature and the drop position as numbers.',
+  fbRecAll:'All 4 beakers are measured! Copy the results below onto your worksheet table.',
+  fbRec:i=>`Beaker ${i} recorded! Take out the dropper and move to beaker ${i+1}.`,
+  fbBadT:'Check the number on the thermometer screen again.',
+  fbBadX:'Use the magnifier to read again where the <b>bottom edge</b> of the drop is on the ruler. One small mark is 0.1 cm.',
+  fbBadX2:'Read the mark that the red dashed line (bottom edge of the drop) points to in the magnifier.',
+  doneT:'🎉 Measurement complete!', doneP:'Copy your values onto the worksheet table, then draw a graph with water temperature on the horizontal axis and drop position on the vertical axis.',
+  myHyp:'My hypothesis', compare:'Compare your results with your hypothesis. Do they match?',
+  copy:'Copy results', print:'Print results', copied:'Copied! You can paste it into a spreadsheet.',
+  printTitle:'Temperature and Volume of a Gas – Virtual Lab Results', printName:'Class (　　)  No. (　　)  Name: (　　　　　　)',
+  g5lead:'Starting with the coldest beaker, put in the dropper and thermometer, then measure and record the water temperature and drop position.',
+  g5t:i=>`Measure and record beaker ${i}`, g5orderT:'How to measure',
+  g5order:'① Put into the beaker → ② Wait until the thermometer stops → ③ Read the drop position with the magnifier → ④ Record in the table → ⑤ Take out and move to the next beaker',
+  g5help:'Measure the position of the drop from its <b>bottom edge</b>.',
+  g5safe:'Handle glassware carefully so it does not break, and be careful not to get burned by hot water.'
+},
+
+zh:{
+  docTitle:'虚拟实验室 · 气体的温度与体积的关系',
+  badge:'探究 ①', title:'气体的温度和体积有什么关系？', sub:'初中一年级 · 第六单元 气体的性质 · 虚拟实验室（教科书第210页）',
+  steps:['开始探究','材料与安全','制作滴管','加入水滴','不同温度的水','测量与记录'],
+  prev:'◀ 上一步', home:'⟲ 回到开头', next:'下一步 ▶',
+  hintDoneLast:'测量全部完成。请把结果抄到学习单上。', hintLast:'请测量全部4个烧杯。',
+  hintDone:'做得好！进入下一步吧。', hintTodo:'完成这一步后，[下一步]按钮就会亮起。',
+  redo:'↺ 重做这一步', redoTitle:'要重做这一步吗？', redoText:'如果更改这一步，后面步骤的记录也会一起被清除。', redoYes:'重做', cancel:'取消',
+  homeTitle:'要回到开头吗？', homeText:'可以保留记录回到第一个画面，也可以全部清除重新开始。',
+  homeKeep:'回到第一个画面（保留记录）', homeReset:'全部清除，重新开始',
+  helpT:'实验小帮手', safeT:'⚠ 安全', helpShow:'💡 查看提示', helpHide:'💡 收起提示',
+  /* 0 */
+  s0obs:'观察', s0obsSub:'炎热的夏天，把剩一点水的矿泉水瓶放进冰箱会怎样？', fridgeTemp:'约 4 ℃', laterTxt:'⏱ 几个小时后…',
+  btnFridge:'把水瓶放进冰箱', btnReplay:'再看一次',
+  qLabel:'探究问题', q:'放在冰箱里的矿泉水瓶为什么瘪了？',
+  probL:'提出问题', prob:'气体的体积会随温度怎样变化？',
+  hypL:'作出假设', hypPh:'写下你的假设。', hypFrame:'句型：气体的温度越（　　），气体的体积就越（　　）。',
+  hypSave:'保存假设', hypEdit:'修改', hypLocked:'请先把水瓶放进冰箱观察。',
+  plan:'把空气封在滴管里，放进不同温度的水中，观察空气的体积怎样变化。',
+  varTitle:'确定变量', varSub:'把卡片拖到格子里，或者先点卡片再点格子',
+  slot_m:'① 自变量', slot_ms:'要改变的条件', slot_d:'② 因变量', slot_ds:'要观察的结果', slot_c:'③ 控制变量', slot_cs:'保持不变的条件', dropHere:'放在这里',
+  var_temp:'气体的温度', var_vol:'滴管内气体的体积', var_pres:'气体的压强等',
+  fbFridge:'水瓶瘪了！瓶子里的空气发生了什么？写下你的假设，再在下面确定变量。',
+  fbVarOk:s=>({m:'对了！实验者有意改变的条件是气体的温度。',d:'对了！观察温度改变时滴管内气体的体积怎样变化。',c:'对了！像气体的压强这样可能影响结果的条件要保持不变。'})[s],
+  fbVarNo:s=>'再想一想。'+({m:'自变量是实验者<u>有意改变</u>的条件。',d:'因变量是因为自变量改变而<u>随之变化、需要测量</u>的量。',c:'控制变量是实验过程中<u>保持不变</u>的条件。'})[s],
+  fbHypShort:'请把假设写得再具体一些，要同时写出气体的温度和体积会怎样。',
+  fbHypNeed:'假设中要同时包含<b>温度</b>和<b>体积</b>这两个词。可以参考句型。',
+  fbHypOk:'假设已保存！实验结束后，比较一下你的假设和实验结果。',
+  fbS0Done:'开始探究完成！现在准备实验吧。请点击[下一步 ▶]。',
+  g0lead:'通过实验找出冰箱里的矿泉水瓶变瘪的原因。',
+  g0t1:'把水瓶放进冰箱并观察', g0t2:'写下并保存你的假设', g0t3:n=>`把变量卡片放进正确的格子（${n}/3）`,
+  g0hT:'写假设的小帮手', g0h:'假设是你对探究问题预想的答案。要同时写出原因（气体的温度）和结果（气体的体积）。',
+  g0nT:'什么是变量？', g0n:'<b>自变量</b>：有意改变的条件<br><b>因变量</b>：随之变化、需要测量的量<br><b>控制变量</b>：保持不变的条件',
+  /* 1 */
+  shelf:'材料架', shelfSub:'只挑选这次实验需要的材料，放到实验台上', bench:'我的实验台', benchEmpty:'这里还没有东西。请点击架子上的材料。', ppeTitle:'穿戴安全防护用品', personAria:'穿戴安全防护用品的学生',
+  it_dropper:'1 mL 滴管 2支', it_dye:'食用色素', it_beaker:'250 mL 烧杯 4个', it_thermo:'温度计', it_ruler:'直尺', it_scissors:'剪刀', it_tape:'透明胶带', it_cold:'冷水', it_hot:'热水', it_lamp:'酒精灯', it_magnet:'磁铁', it_scale:'电子秤',
+  why_lamp:'这次实验不用火，而是把冷水和热水混合来调节温度。', why_magnet:'磁铁不用于气体温度和体积的实验。', why_scale:'这次实验不测量质量，水的量用烧杯上的刻度来量。',
+  ppe_coat:'实验服', ppe_goggles:'护目镜', ppe_glove:'实验手套', ppe_heat:'隔热手套',
+  fbGot:n=>`${n} 已准备好！`, fbNo:(n,w)=>`${n}：这次实验不需要。${w}`, fbPpeOn:n=>`已穿戴${n}！`, fbPpeOff:'你脱下了安全防护用品。做实验时一定要穿戴好。',
+  fbS1Done:'准备完毕！安全防护用品也都穿戴好了。请点击[下一步 ▶]。',
+  g1lead:'准备实验需要的材料，并穿戴安全防护用品。', g1t1:(a,b)=>`把需要的材料全部移过去（${a}/${b}）`, g1t2:(a,b)=>`穿戴安全防护用品（${a}/${b}）`,
+  g1safe:'使用玻璃器材时要小心，不要打碎。<br>使用热水时注意不要烫伤。',
+  /* 2 */
+  s2cutT:'① 剪滴管', s2cutS:'用剪刀在离尖端 2 cm 的地方点击，把它剪掉',
+  s2alT:'② 对准零点', s2alS:'左右拖动滴管，让圆头一端对准直尺的 0',
+  s2tpT:'③ 贴胶带', s2tpS:'点击两个闪烁的位置，贴上透明胶带',
+  s2dnT:'滴管准备完毕', s2dnS:'圆头一端已对准直尺的零点并固定好',
+  bulb:'圆头部分', tip:'尖端', fromTip:'离滴管尖端的长度（cm）', cutLbl:d=>`离尖端 ${d} cm`, snip:'咔嚓！✂',
+  cutHint:'💡 把剪刀移到滴管上，就能看到离尖端的长度。',
+  fbCutOk:'剪好了！剪掉了尖端 2 cm。现在把圆头一端对准直尺的零点。',
+  fbCutNo:d=>`现在的位置离尖端约 ${d} cm。请看下面的刻度，在 <b>2 cm</b> 处剪。`,
+  magZero:'🔍 零点放大', zeroOk:'已对准零点 ✓', taped:'滴管已牢牢贴在直尺上 ✓', nudge:'微调',
+  tapeHint:'贴胶带时不要让滴管移动。',
+  fbAlignOk:'零点对好了！圆头一端正好在直尺的 0 处。',
+  fbAlignNo:r=>r?'看看放大镜。圆头一端在 0 的右边，请把滴管往<b>左</b>移。':'看看放大镜。圆头一端在 0 的左边，请把滴管往<b>右</b>移。',
+  fbTape1:'贴好了一处，再贴另一处吧。', fbS2Done:'滴管已贴在直尺上！请点击[下一步 ▶]加入水滴。',
+  g2lead:'剪掉滴管的尖端，把它贴在直尺上，以便测量水滴的位置。',
+  g2t1:'剪掉滴管尖端 2 cm', g2t2:'把圆头一端对准直尺的零点（0）', g2t3:'用透明胶带把滴管贴在直尺上',
+  g2help:'滴管圆头的一端要对准直尺的 0，才能准确测量水滴的位置。', g2safe:'使用剪刀时小心不要伤到手。',
+  /* 3 */
+  s3t1:'① 吸取色素水', s3s1:'请点击下面的[吸取色素水]',
+  s3t2:'② 把滴管伸到里面，滴入1滴', s3s2:'把深度滑块推到底试试',
+  s3t3:'水滴已加入', s3s3:'水滴把空气封住了', s3t4:'请重新滴入', s3s4:'水滴离管口太近了',
+  stuck:'再也推不进去了（滴管尖端被卡住了）', dyePrep:'准备色素水', dyeWater:'加了食用色素的水',
+  btnFill:'吸取色素水', filledBtn:'✓ 已吸取', dropTitle:'加入水滴', depthL:'滴管伸入的深度',
+  btnDrop:'💧 挤一下，滴入1滴', btnRetry:'甩掉水滴，重新滴入',
+  s3info:'滴入水滴后，滴管的圆头部分和水滴之间就<b>封住了空气</b>。水滴就成了显示这部分空气体积的标记。',
+  airLbl:'被封住的空气（观察对象）', dropLbl:'水滴',
+  fbRetry:'已甩掉水滴。这次请把滴管尽量伸到最里面。',
+  fbFilled:'已吸取色素水。现在把上图中的滴管往里推。',
+  fbDropOk:'水滴进到滴管里面了！空气已被封住。请点击[下一步 ▶]。',
+  fbDropFar:'水滴离管口太近了。放进热水后空气膨胀，可能会把水滴推出去。请点击[甩掉水滴，重新滴入]，这次要<b>尽量伸到最里面</b>。',
+  g3lead:'在贴好的滴管里滴入1滴色素水，把空气封住。',
+  g3t1:'用另一支滴管吸取色素水', g3t2:'把滴管尽量伸到最里面', g3t3:'滴入1滴色素水',
+  g3help:'往剪过的滴管里滴色素水时，要让水滴尽量进到滴管的最里面。',
+  /* 4 */
+  s4T:'配制4杯温度不同的水', s4S:'把冷水和热水混合，每个烧杯装 150 mL',
+  cold:'冷水', hot:'热水', burn:'⚠ 小心烫伤', beakerN:i=>`烧杯 ${i}`, pour:'倒入', dump:'倒掉重来', check4:'检查4个烧杯',
+  feelPre:'用手背摸：', feel:['❄ 很凉','凉','温的','暖和','烫'], ariaHot:i=>`烧杯 ${i} 热水的量`,
+  fbDump:(i,h)=>`已倒掉烧杯 ${i} 的水。`+(h?'水温改变了，所以测量记录也被清除了。':''),
+  fbPour:i=>`已往烧杯 ${i} 倒入 150 mL 水。准确的温度要在测量步骤中用温度计测。`,
+  fb4Hot:i=>`烧杯 ${i} 的水太烫了。有烫伤的危险，滴管里的水滴也可能被推出去。请倒掉，多加点冷水。`,
+  fb4Order:i=>`烧杯 ${i} 没有比烧杯 ${i-1} 更热。编号越大，热水要放得越多，让水越来越热。`,
+  fb4Gap:i=>`烧杯 ${i-1} 和烧杯 ${i} 的温度太接近了。把热水的量差得再大一些。`,
+  fbS4Done:'很好！4杯温度不同的水准备好了。请点击[下一步 ▶]开始测量。',
+  g4lead:'把冷水和热水混合，配出4杯温度不同的水，每个烧杯装 150 mL。',
+  g4t1:n=>`往4个烧杯里各倒入 150 mL 水（${n}/4）`, g4t2:'编号越大水越热（通过检查）',
+  g4help:'烧杯1多放冷水，烧杯4多放热水。烧杯之间热水的量相差 20~30 mL 以上，温度差别就会很明显。',
+  g4safe:'使用热水时请戴上隔热手套，以免烫伤。',
+  /* 5 */
+  s5T:'测量', s5S:'从温度低的烧杯开始，依次测量水的温度和水滴的位置',
+  roomT:'室温', rulesT:'⚠ 实验安全守则', rule1:'· 小心使用玻璃器材', rule2:'· 注意不要被热水烫伤',
+  thermo:'🌡 数字温度计', inAir:'在空气中', changing:'温度正在变化…', stableTxt:'数字停住了', readWhen:'等数字不再变化时再读数。',
+  mag:'🔍 放大镜（直尺刻度放大）', bottom:'最下端！', tableT:'📋 实验结果记录表',
+  thNo:'烧杯编号', thT:'水的温度(℃)', thX:'水滴的位置(cm)', decimal:'记录到小数点后一位（例：23.7）', rec:'记录',
+  ariaT:i=>`烧杯 ${i} 水的温度`, ariaX:i=>`烧杯 ${i} 水滴的位置`,
+  btnIn:i=>`⬇ 放入烧杯 ${i}`, btnOut:i=>`⬆ 从烧杯 ${i} 中取出`, btnOutAll:'取出滴管', measDone:'测量完成！', allDone:'4个烧杯全部测量完毕 ✓',
+  inHint:'从温度最低的烧杯1开始依次测量。', outHint:'温度计的数字停住后，读出温度和水滴的位置，记在表格里。',
+  fbIn:i=>`已放入烧杯 ${i}。请等温度计的数字停住。`,
+  fbNotStable:'温度计的数字还在变化。等数字停住后再读数。',
+  fbNaN:'请用数字写出水的温度和水滴的位置。',
+  fbRecAll:'4个烧杯全部测量完毕！请把下面的结果抄到学习单的表格里。',
+  fbRec:i=>`烧杯 ${i} 记录完成！取出滴管，移到烧杯 ${i+1}。`,
+  fbBadT:'请再确认一下温度计屏幕上的数字。',
+  fbBadX:'用放大镜重新读一读水滴的<b>最下端</b>在直尺的哪个刻度上。一小格是 0.1 cm。',
+  fbBadX2:'读出放大镜中红色虚线（水滴最下端）所指的刻度。',
+  doneT:'🎉 测量完成！', doneP:'把记录的数值抄到学习单的表格里，以水的温度为横轴、水滴的位置为纵轴画出图像。',
+  myHyp:'我的假设', compare:'比较一下实验结果和你的假设是否一致。',
+  copy:'复制结果', print:'打印结果', copied:'已复制！可以粘贴到电子表格里。',
+  printTitle:'气体的温度与体积的关系 —— 虚拟实验结果', printName:'（　　）班（　　）号　姓名：（　　　　　　）',
+  g5lead:'从温度低的烧杯开始，依次放入滴管和温度计，测量并记录水的温度和水滴的位置。',
+  g5t:i=>`测量并记录烧杯 ${i}`, g5orderT:'测量顺序',
+  g5order:'① 放入烧杯 → ② 等温度计数字停住 → ③ 用放大镜读水滴位置 → ④ 记入表格 → ⑤ 取出，移到下一个烧杯',
+  g5help:'测量水滴的位置时，以水滴的<b>最下端</b>为准。',
+  g5safe:'使用玻璃器材时小心不要打碎，注意不要被热水烫伤。'
+}
+};
+let LANG='ko';
+function t(k,...a){ const v=(L[LANG][k]!==undefined)?L[LANG][k]:L.ko[k]; return typeof v==='function'?v(...a):v; }
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+/* ===================== 기본 설정 ===================== */
+const ROOM = 20;          // 실험실 온도(℃)
+const LB = 7.4;           // 스포이트 둥근 부분 부피를 관 길이(cm)로 환산한 값
+const DROP = 0.45;        // 물방울 길이(cm)
+const KEYS = ['s0','s1','s2','s3','s4','s5'];
+
+const $ = s => document.querySelector(s);
+const rnd = (a,b) => a + Math.random()*(b-a);
+const r1 = v => Math.round(v*10)/10;
+const pick = a => a[Math.floor(Math.random()*a.length)];
+const shuffle = a => { a=[...a]; for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];} return a; };
+const clamp = (v,a,b) => Math.max(a,Math.min(b,v));
+
+// 일정한 압력에서 기체의 온도에 따른 물방울 위치(cm) — 샤를 법칙 모델
+function dropPos(T, xRoom){ return (LB + xRoom)*(T+273.15)/(ROOM+273.15) - LB; }
+
+let timers=[], rafs=[];
+function later(fn,ms){ const id=setTimeout(fn,ms); timers.push(id); return id; }
+function tween(dur, fn, done){
+  const t0=performance.now(); let id, alive=true;
+  function f(now){
+    if(!alive) return;
+    const k=Math.min(1,(now-t0)/dur);
+    const e=k<.5?2*k*k:1-Math.pow(-2*k+2,2)/2;
+    fn(e,k);
+    if(k<1) id=requestAnimationFrame(f); else if(done) done();
+  }
+  id=requestAnimationFrame(f);
+  rafs.push(()=>{alive=false;cancelAnimationFrame(id);});
+}
+function clearAnims(){ timers.forEach(clearTimeout); timers=[]; rafs.forEach(c=>c()); rafs=[]; S.busy=false; }
+function svgPt(svg,e){ const p=svg.createSVGPoint(); p.x=e.clientX; p.y=e.clientY; return p.matrixTransform(svg.getScreenCTM().inverse()); }
+
+/* ===================== 상태 ===================== */
+const ITEMS = [
+  {id:'dropper',need:true},{id:'dye',need:true},{id:'beaker',need:true},{id:'thermo',need:true},{id:'ruler',need:true},
+  {id:'scissors',need:true},{id:'tape',need:true},{id:'cold',need:true},{id:'hot',need:true},
+  {id:'lamp',need:false},{id:'magnet',need:false},{id:'scale',need:false}
+];
+const NEED_N = ITEMS.filter(i=>i.need).length;
+const PPE = ['coat','goggles','glove','heat'];
+const VARS = [{id:'temp',slot:'m'},{id:'vol',slot:'d'},{id:'pres',slot:'c'}];
+
+const init = {
+  s0: () => ({bottle:0, hyp:'', hypSaved:false, placed:{m:null,d:null,c:null}, sel:null, order:shuffle(VARS.map(v=>v.id)), done:false}),
+  s1: () => ({order:shuffle(ITEMS.map(i=>i.id)), got:[], ppe:[], done:false}),
+  s2: () => ({cut:false, off:pick([-1.4,-0.9,0.8,1.2,1.6]), aligned:false, tape:[false,false], done:false}),
+  s3: () => ({filled:false, depth:0, dropped:false, xRoom:null, done:false}),
+  s4: () => ({b:[0,1,2,3].map(()=>({hot:0, poured:false, temp:null})), done:false}),
+  s5: () => ({rows:[0,1,2,3].map(()=>({t:'',x:'',ok:false,tries:0})), at:0, ins:false, Tair:ROOM, Tp:ROOM, Y:null, done:false})
+};
+const S = {step:0, fb:null, busy:false, helpOpen:false};
+KEYS.forEach(k=>S[k]=init[k]());
+
+// 앞 단계가 바뀌면 뒤 단계 기록도 무효가 됨
+const DEPENDS = {s2:['s3','s5'], s3:['s5'], s4:['s5']};
+function resetStep(k){ S[k]=init[k](); (DEPENDS[k]||[]).forEach(d=>S[d]=init[d]()); }
+function invalidate(k){ (DEPENDS[k]||[]).forEach(d=>S[d]=init[d]()); }
+function s5HasData(){ return S.s5.rows.some(r=>r.ok); }
+
+/* ===================== 공통 렌더링 ===================== */
+const stageEl=$('#stage'), guideEl=$('#guide');
+function canReach(n){ for(let i=0;i<n;i++) if(!S[KEYS[i]].done) return false; return true; }
+
+function renderChrome(){
+  document.documentElement.lang = LANG==='zh'?'zh-CN':LANG;
+  document.title=t('docTitle');
+  $('#hBadge').textContent=t('badge'); $('#hTitle').textContent=t('title'); $('#hSub').textContent=t('sub');
+  $('#btnPrev').textContent=t('prev'); $('#btnHome').textContent=t('home'); $('#btnNext').textContent=t('next');
+  document.querySelectorAll('.lang button').forEach(b=>{ b.classList.toggle('on',b.dataset.lang===LANG); b.setAttribute('aria-pressed',b.dataset.lang===LANG); });
+}
+function renderSteps(){
+  const names=t('steps');
+  $('#steps').innerHTML = names.map((nm,i)=>{
+    const cls=[S[KEYS[i]].done?'done':'', i===S.step?'cur':'', (i!==S.step&&canReach(i))?'can':''].join(' ');
+    return `<li class="${cls}" data-i="${i}" title="${nm}"><span class="n">${S[KEYS[i]].done&&i!==S.step?'✓':i}</span><span class="nm">${nm}</span></li>`;
+  }).join('');
+  document.querySelectorAll('#steps li.can').forEach(li=>li.onclick=()=>go(+li.dataset.i));
+}
+function updateNav(){
+  const done=S[KEYS[S.step]].done, last=S.step===KEYS.length-1;
+  $('#btnPrev').disabled = S.step===0;
+  $('#btnNext').style.visibility = last?'hidden':'visible';
+  $('#btnNext').disabled = !done;
+  $('#navHint').textContent = last ? (done?t('hintDoneLast'):t('hintLast')) : (done?t('hintDone'):t('hintTodo'));
+}
+// 피드백은 번역 키로 저장 → 언어를 바꿔도 같은 내용이 새 언어로 보임
+function fb(type,k,...a){ S.fb={type,k,a}; }
+function setFb(type,k,...a){ fb(type,k,...a); renderGuide(); }
+function refresh(){ renderGuide(); updateNav(); renderSteps(); }
+function render(scroll=true){
+  clearAnims();
+  renderChrome();
+  stageEl.innerHTML='';
+  STEPS[S.step].render(stageEl);
+  refresh();
+  if(scroll) $('.main').scrollTop=0;
+}
+function go(n){ if(n<0||n>=KEYS.length) return; S.step=n; S.fb=null; render(); }
+
+function renderGuide(){
+  const g=STEPS[S.step].guide();
+  const fbHtml=S.fb?`<div class="feedback ${S.fb.type}" role="status">${t(S.fb.k,...S.fb.a)}</div>`:`<div class="feedback" role="status"></div>`;
+  const safe=(g.notes||[]).filter(n=>n[0]==='safe'), help=(g.notes||[]).filter(n=>n[0]==='help');
+  guideEl.innerHTML = `
+    <div class="g-left">
+      <div><div class="g-step">STEP ${S.step} / ${KEYS.length-1}</div><h2>${t('steps')[S.step]}</h2></div>
+      ${(S.step===5&&S.s5.done)?'':`<p class="g-lead">${g.lead}</p>`}
+      ${(S.step===5&&S.s5.done)?'':`<ul class="tasks">${g.tasks.map(x=>`<li class="${x[1]?'done':''}">${x[0]}</li>`).join('')}</ul>`}
+    </div>
+    <div class="g-right">
+      ${(S.step===5&&S.s5.done)?'<div id="s5done"></div>':fbHtml}
+      ${safe.map(n=>`<div class="safe-line"><b>${n[1]}</b> ${n[2]}</div>`).join('')}
+      ${help.length?`<button class="help-tg" id="helpTg" aria-expanded="${S.helpOpen}">${S.helpOpen?t('helpHide'):t('helpShow')}</button>
+        <div class="help-box" ${S.helpOpen?'':'hidden'}>${help.map(n=>`<div class="note help"><span class="nt">${n[1]}</span>${n[2]}</div>`).join('')}</div>`:''}
+      ${g.redo?`<button class="redo" id="btnRedo">${t('redo')}</button>`:''}
+    </div>
+  `;
+  const ht=$('#helpTg'); if(ht) ht.onclick=()=>{ S.helpOpen=!S.helpOpen; renderGuide(); };
+  if(S.step===5) drawDone();
+  const rb=$('#btnRedo');
+  if(rb) rb.onclick=()=>{
+    const hasLater=(DEPENDS[KEYS[S.step]]||[]).some(k=>S[k].done || (k==='s5'&&s5HasData()) || (k==='s3'&&S.s3.dropped));
+    const doIt=()=>{ resetStep(KEYS[S.step]); S.fb=null; render(); };
+    if(hasLater) confirmModal(t('redoTitle'),t('redoText'),[[t('redoYes'),'warm',doIt],[t('cancel'),'',null]]);
+    else doIt();
+  };
+}
+
+/* 모달 */
+function confirmModal(title,text,btns){
+  $('#mTitle').textContent=title; $('#mText').textContent=text;
+  const box=$('#mBtns'); box.innerHTML='';
+  btns.forEach(([label,cls,fn])=>{
+    const b=document.createElement('button'); b.textContent=label; if(cls) b.className=cls;
+    b.onclick=()=>{ $('#modal').hidden=true; if(fn) fn(); };
+    box.appendChild(b);
+  });
+  $('#modal').hidden=false;
+}
+$('#btnPrev').onclick=()=>go(S.step-1);
+$('#btnNext').onclick=()=>{ if(S[KEYS[S.step]].done) go(S.step+1); };
+$('#btnHome').onclick=()=>confirmModal(t('homeTitle'),t('homeText'),[
+  [t('homeKeep'),'primary',()=>go(0)],
+  [t('homeReset'),'warm',()=>{ KEYS.forEach(k=>S[k]=init[k]()); go(0); }],
+  [t('cancel'),'',null]
+]);
+// 언어 바꾸기: 진행 상황은 그대로, 화면만 다시 그림
+document.querySelectorAll('.lang button').forEach(b=>b.onclick=()=>{
+  if(b.dataset.lang===LANG) return;
+  LANG=b.dataset.lang;
+  try{ localStorage.setItem('gasLabLang',LANG); }catch(e){}
+  render(false);
+});
+try{ const sv=localStorage.getItem('gasLabLang'); if(sv&&L[sv]) LANG=sv; }catch(e){}
+
+/* ===================== 그림 도우미 ===================== */
+function tubeHalf(c){ return c<11 ? 0.25 : Math.max(0.075, 0.25-(c-11)/4*0.175); }
+function dropperPath(Ln, map){
+  const P=(cx,cy)=>{const [X,Y]=map(cx,cy); return X.toFixed(1)+','+Y.toFixed(1);};
+  const hw=tubeHalf(Ln);
+  return `M${P(0,0)} C${P(0,-0.75)} ${P(0.6,-0.8)} ${P(1.6,-0.8)} C${P(2.8,-0.8)} ${P(3.2,-0.5)} ${P(3.5,-0.25)} L${P(11,-0.25)} L${P(Ln,-hw)} L${P(Ln,hw)} L${P(11,0.25)} L${P(3.5,0.25)} C${P(3.2,0.5)} ${P(2.8,0.8)} ${P(1.6,0.8)} C${P(0.6,0.8)} ${P(0,0.75)} ${P(0,0)} Z`;
+}
+function tipPiecePath(map){
+  const P=(cx,cy)=>{const [X,Y]=map(cx,cy); return X.toFixed(1)+','+Y.toFixed(1);};
+  return `M${P(13,-tubeHalf(13))} L${P(15,-tubeHalf(15))} L${P(15,tubeHalf(15))} L${P(13,tubeHalf(13))} Z`;
+}
+const mapH=(x0,y0,s)=>(cx,cy)=>[x0+cx*s, y0+cy*s];
+function rulerH(x0,y,s,max,h){
+  let o=`<rect x="${x0-0.45*s}" y="${y}" width="${(max+0.9)*s}" height="${h}" rx="4" fill="#f3e6b8" stroke="#c9b67a"/>`;
+  for(let mm=0;mm<=max*10;mm++){
+    const X=x0+mm/10*s, len=mm%10===0?h*.42:mm%5===0?h*.3:h*.18;
+    o+=`<line x1="${X}" y1="${y}" x2="${X}" y2="${y+len}" stroke="#5a4a1e" stroke-width="${mm%10===0?1.3:.8}"/>`;
+    if(mm%10===0) o+=`<text x="${X}" y="${y+h*.8}" font-size="${Math.min(13,s*.34)}" text-anchor="middle" fill="#4a3d17" font-weight="700">${mm/10}</text>`;
+  }
+  return o;
+}
+function waterColor(T){
+  if(T==null) return 'rgba(150,200,230,.55)';
+  const k=clamp((T-5)/45,0,1);
+  const st=[[0,[130,190,235]],[0.45,[236,221,168]],[1,[245,145,100]]];
+  const j=k<=0.45?0:1, [k0,a]=st[j], [k1,b]=st[j+1], u=(k-k0)/(k1-k0);
+  const c=a.map((v,i)=>Math.round(v+(b[i]-v)*u));
+  return `rgba(${c[0]},${c[1]},${c[2]},.72)`;
+}
+function feelIdx(T){ return T<12?0:T<22?1:T<32?2:T<42?3:4; }
+const FEEL_COL=['#1f6ea0','#2a7fa8','#6b7d3a','#c26a1c','#c4492a'];
+function beakerSVG(id,cx,base,w,h,mL,T,num,fillOverride){
+  const l=cx-w/2, r=cx+w/2, top=base-h;
+  let marks='';
+  [50,100,150,200].forEach(v=>{ const y=base-4-v/250*(h-14); marks+=`<line x1="${l+6}" y1="${y}" x2="${l+22}" y2="${y}" stroke="#7d93a0" stroke-width="1"/><text x="${l+25}" y="${y+4}" font-size="10" fill="#6d8290">${v}</text>`; });
+  return `<g id="${id}">
+    <path id="${id}w" d="${waterPath(l,r,base,h,mL)}" fill="${fillOverride||waterColor(T)}"/>
+    <path d="M${l-7},${top} Q${l},${top} ${l},${top+9} L${l},${base-10} Q${l},${base} ${l+10},${base} L${r-10},${base} Q${r},${base} ${r},${base-10} L${r},${top+9} Q${r},${top} ${r+4},${top}" fill="rgba(235,245,250,.25)" stroke="#8fa6b2" stroke-width="2.4" stroke-linejoin="round"/>
+    <path d="M${l+5},${top+16} L${l+5},${base-14}" stroke="rgba(255,255,255,.7)" stroke-width="3" stroke-linecap="round"/>
+    ${marks}
+    ${num?`<circle cx="${cx}" cy="${base+20}" r="13" fill="#2c3a43"/><text x="${cx}" y="${base+25}" text-anchor="middle" font-size="14" font-weight="700" fill="#fff">${num}</text>`:''}
+  </g>`;
+}
+function waterPath(l,r,base,h,mL){
+  if(mL<=0) return '';
+  const y=base-3-mL/250*(h-14);
+  return `M${l+2},${y} L${r-2},${y} L${r-2},${base-9} Q${r-2},${base-2} ${r-9},${base-2} L${l+9},${base-2} Q${l+2},${base-2} ${l+2},${base-9} Z`;
+}
+function tableBg(w,h){ return `<rect width="${w}" height="${h}" fill="#f1ede4"/><rect y="${h-26}" width="${w}" height="26" fill="#ddd4c3"/>`; }
+
+/* ===================== 아이콘 ===================== */
+const ICON = {
+  dropper:`<g transform="rotate(-35 32 32)"><ellipse cx="32" cy="12" rx="7" ry="9" fill="#dfe9ef" stroke="#7d93a0" stroke-width="2"/><path d="M29 20h6l-1 30-2 6-2-6z" fill="#eef4f7" stroke="#7d93a0" stroke-width="2" stroke-linejoin="round"/></g>`,
+  dye:`<rect x="24" y="8" width="16" height="9" rx="2" fill="#555"/><path d="M20 20h24v34a4 4 0 0 1-4 4H24a4 4 0 0 1-4-4z" fill="#fff" stroke="#999" stroke-width="2"/><path d="M21 34h22v20a3 3 0 0 1-3 3H24a3 3 0 0 1-3-3z" fill="#e03a5a"/><rect x="24" y="24" width="16" height="7" fill="#fbe2e7"/>`,
+  beaker:`<path d="M10 14h26l-2 3v34a4 4 0 0 1-4 4H16a4 4 0 0 1-4-4V17z" fill="#eef6fa" stroke="#7d93a0" stroke-width="2"/><path d="M26 22h28l-2 3v30a4 4 0 0 1-4 4H32a4 4 0 0 1-4-4V25z" fill="#f6fbfd" stroke="#7d93a0" stroke-width="2"/><text x="41" y="48" font-size="12" font-weight="800" text-anchor="middle" fill="#2c3a43">×4</text>`,
+  thermo:`<rect x="20" y="4" width="24" height="22" rx="4" fill="#33424b"/><rect x="24" y="8" width="16" height="10" rx="1" fill="#a9c3a1"/><rect x="30" y="26" width="4" height="32" rx="2" fill="#b8c4ca" stroke="#7d93a0"/>`,
+  ruler:`<g transform="rotate(-35 32 32)"><rect x="4" y="25" width="56" height="14" rx="2" fill="#f3e6b8" stroke="#c9b67a" stroke-width="2"/>${[8,14,20,26,32,38,44,50,56].map((x,i)=>`<line x1="${x}" y1="25" x2="${x}" y2="${i%2?30:33}" stroke="#5a4a1e" stroke-width="1.5"/>`).join('')}</g>`,
+  scissors:`<circle cx="18" cy="46" r="8" fill="none" stroke="#e07a2f" stroke-width="4"/><circle cx="40" cy="48" r="8" fill="none" stroke="#e07a2f" stroke-width="4"/><path d="M23 40L46 8M35 42L20 10" stroke="#8fa0a8" stroke-width="5" stroke-linecap="round"/>`,
+  tape:`<circle cx="30" cy="32" r="18" fill="#f6f1d8" stroke="#c9bf8f" stroke-width="2"/><circle cx="30" cy="32" r="9" fill="#fff" stroke="#c9bf8f" stroke-width="2"/><path d="M44 42l14 6-3 6-13-7z" fill="#f6f1d8" stroke="#c9bf8f" stroke-width="1.5"/>`,
+  cold:`<path d="M14 14h30l4 6v32a4 4 0 0 1-4 4H18a4 4 0 0 1-4-4z" fill="#eef6fa" stroke="#7d93a0" stroke-width="2"/><path d="M48 22h4a4 4 0 0 1 4 4v12a4 4 0 0 1-4 4h-4" fill="none" stroke="#7d93a0" stroke-width="2.5"/><path d="M15 26h32v26a3 3 0 0 1-3 3H18a3 3 0 0 1-3-3z" fill="#9ccbe6"/><rect x="20" y="28" width="9" height="9" rx="2" fill="#fff" opacity=".85"/><rect x="32" y="33" width="8" height="8" rx="2" fill="#fff" opacity=".85"/>`,
+  hot:`<path d="M14 26c0-8 8-12 18-12s18 4 18 12v24a6 6 0 0 1-6 6H20a6 6 0 0 1-6-6z" fill="#d9e0e4" stroke="#7d93a0" stroke-width="2"/><path d="M50 30l10-6" stroke="#7d93a0" stroke-width="4" stroke-linecap="round"/><rect x="26" y="8" width="12" height="6" rx="2" fill="#555"/><path d="M8 18c3-3-1-5 2-9M56 12c3-3-1-5 2-9" stroke="#bbb" stroke-width="2" fill="none"/><rect x="18" y="34" width="28" height="8" rx="2" fill="#e07a2f"/>`,
+  lamp:`<path d="M14 42a18 14 0 0 0 36 0c0-8-8-12-18-12s-18 4-18 12z" fill="#eef6fa" stroke="#7d93a0" stroke-width="2"/><rect x="28" y="20" width="8" height="10" fill="#bbb"/><path d="M32 6c5 6 5 10 0 14-5-4-5-8 0-14z" fill="#f4a33a"/>`,
+  magnet:`<path d="M14 10v22a18 18 0 0 0 36 0V10H40v22a8 8 0 0 1-16 0V10z" fill="#d94b4b"/><rect x="14" y="10" width="10" height="9" fill="#ddd"/><rect x="40" y="10" width="10" height="9" fill="#ddd"/>`,
+  scale:`<rect x="8" y="30" width="48" height="22" rx="4" fill="#d9e0e4" stroke="#7d93a0" stroke-width="2"/><rect x="12" y="24" width="40" height="6" rx="2" fill="#bfc9ce"/><rect x="18" y="38" width="20" height="8" rx="1" fill="#a9c3a1"/>`
+};
+const icon = id => `<svg viewBox="0 0 64 64" aria-hidden="true">${ICON[id]}</svg>`;
+
+/* ===================== STEP 0 : 탐구 시작 ===================== */
+const BOTTLE_N='M-8,10 C-8,22 -26,24 -26,38 L-26,104 Q-26,110 -20,110 L20,110 Q26,110 26,104 L26,38 C26,24 8,22 8,10 Z';
+const BOTTLE_C='M-8,10 C-8,22 -24,26 -22,38 L-13,50 L-24,63 L-12,77 L-24,91 L-22,104 Q-22,110 -16,110 L16,110 Q22,110 22,104 L24,91 L12,77 L24,63 L13,50 L22,38 C24,26 8,22 8,10 Z';
+function hypValid(s){
+  const v=s.trim();
+  if(v.length<8) return 'short';
+  const hasT=/온도|temperat|温度|溫度/i.test(v), hasV=/부피|volume|体积|體積/i.test(v);
+  return (hasT&&hasV)?'ok':'need';
+}
+function renderS0(el){
+  const st=S.s0, seen=st.bottle===2;
+  const hypBlock = st.hypSaved
+    ? `<div class="q-line hyp saved"><b>${t('hypL')}</b><span class="hyp-text">${esc(st.hyp)}</span><button class="sm" id="btnHypEdit">✎ ${t('hypEdit')}</button></div>`
+    : `<div class="q-line hyp ${seen?'':'hide'}"><b>${t('hypL')}</b>
+        <textarea id="hypIn" rows="2" placeholder="${esc(seen?t('hypPh'):t('hypLocked'))}" ${seen?'':'disabled'}>${esc(st.hyp)}</textarea>
+        <div class="hyp-frame">${t('hypFrame')}</div>
+        <button class="sm primary" id="btnHypSave" ${seen?'':'disabled'}>${t('hypSave')}</button></div>`;
+  el.innerHTML=`
+  <div class="grow-row">
+    <div class="card col" style="flex:1.05 1 0">
+      <h3 class="ch">${t('s0obs')} <small>${t('s0obsSub')}</small></h3>
+      <div class="scene-box"><svg viewBox="0 0 520 290" id="fsvg">
+        <rect width="520" height="290" fill="#f4efe6"/>
+        <rect y="262" width="520" height="28" fill="#ddd3c2"/>
+        <g id="fridge">
+          <rect x="300" y="18" width="180" height="246" rx="14" fill="#e3eaed" stroke="#9fb0b7" stroke-width="2"/>
+          <rect x="310" y="28" width="160" height="226" rx="8" fill="#f2fbff"/>
+          <line x1="312" y1="120" x2="468" y2="120" stroke="#c7d8df" stroke-width="3"/>
+          <line x1="312" y1="234" x2="468" y2="234" stroke="#c7d8df" stroke-width="3"/>
+          <text x="390" y="60" text-anchor="middle" font-size="13" fill="#7fa6b8">${t('fridgeTemp')}</text>
+        </g>
+        <g id="bottle" style="transition:transform .9s ease-in-out;transform:translate(130px,152px)">
+          <rect x="-9" y="0" width="18" height="11" rx="2" fill="#2f86c6"/>
+          <path id="bN" d="${BOTTLE_N}" fill="rgba(185,225,245,.45)" stroke="#5aa0c6" stroke-width="2" style="transition:opacity .6s"/>
+          <path id="bC" d="${BOTTLE_C}" fill="rgba(185,225,245,.45)" stroke="#5aa0c6" stroke-width="2" style="transition:opacity .6s;opacity:0"/>
+          <rect x="-20" y="94" width="40" height="13" rx="3" fill="rgba(90,170,220,.55)"/>
+          <rect x="-16" y="52" width="32" height="18" rx="2" fill="#fff" opacity=".8"/>
+        </g>
+        <g id="door" style="transition:transform .5s;transform-box:view-box;transform-origin:480px 140px">
+          <rect x="300" y="18" width="180" height="246" rx="14" fill="#dbe4e8" stroke="#9fb0b7" stroke-width="2"/>
+          <rect x="318" y="90" width="7" height="70" rx="3" fill="#9fb0b7"/>
+          <line x1="300" y1="100" x2="480" y2="100" stroke="#c4d0d5" stroke-width="2"/>
+        </g>
+        <g id="clock" style="opacity:0;transition:opacity .4s">
+          <rect x="296" y="110" width="188" height="56" rx="12" fill="#2c3a43"/>
+          <text x="390" y="144" text-anchor="middle" font-size="16" font-weight="700" fill="#fff">${t('laterTxt')}</text>
+        </g>
+      </svg></div>
+      <div class="ctrls"><button class="primary" id="btnFridge">${seen?t('btnReplay'):t('btnFridge')}</button></div>
+    </div>
+    <div class="card q-box" style="flex:1 1 0">
+      <div class="q-main"><span>${t('qLabel')}</span>${t('q')}</div>
+      <div class="q-line ${seen?'':'hide'}"><b>${t('probL')}</b>${t('prob')}</div>
+      ${hypBlock}
+      <div class="q-line ${seen?'':'hide'}" style="font-size:14px;color:#4f5f68">${t('plan')}</div>
+    </div>
+  </div>
+  <div class="card">
+    <h3 class="ch">${t('varTitle')} <small>${t('varSub')}</small></h3>
+    <div class="slots">
+      ${['m','d','c'].map(k=>{
+        const v=st.placed[k];
+        return `<div class="slot ${v?'filled':''}" data-slot="${k}"><div class="slot-h"><b>${t('slot_'+k)}</b><span>${t('slot_'+k+'s')}</span></div><div class="slot-drop">${v?t('var_'+v):t('dropHere')}</div></div>`;
+      }).join('')}
+    </div>
+    <div class="pool" id="pool">
+      ${st.order.filter(id=>!Object.values(st.placed).includes(id)).map(id=>`<div class="vcard ${st.sel===id?'sel':''}" draggable="true" data-id="${id}">${t('var_'+id)}</div>`).join('')}
+    </div>
+  </div>`;
+  if(seen){ $('#bN').style.opacity=0; $('#bC').style.opacity=1; $('#bottle').style.transform='translate(390px,124px)'; $('#door').style.transform='scaleX(.1)'; }
+  $('#btnFridge').onclick=playFridge;
+  const hi=$('#hypIn'); if(hi) hi.oninput=()=>{ st.hyp=hi.value; };
+  const hs=$('#btnHypSave'); if(hs) hs.onclick=saveHyp;
+  const he=$('#btnHypEdit'); if(he) he.onclick=()=>{ st.hypSaved=false; st.done=false; S.fb=null; renderS0(stageEl); refresh(); const x=$('#hypIn'); if(x) x.focus(); };
+  bindVars();
+}
+function saveHyp(){
+  const st=S.s0, r=hypValid(st.hyp);
+  if(r==='short') return setFb('warn','fbHypShort');
+  if(r==='need') return setFb('warn','fbHypNeed');
+  st.hyp=st.hyp.trim(); st.hypSaved=true; fb('ok','fbHypOk');
+  renderS0(stageEl); checkS0();
+}
+function playFridge(){
+  if(S.busy) return; S.busy=true;
+  const b=$('#bottle'), d=$('#door');
+  $('#bN').style.opacity=1; $('#bC').style.opacity=0; b.style.transform='translate(130px,152px)'; d.style.transform='scaleX(1)';
+  later(()=>{ d.style.transform='scaleX(.1)'; },400);
+  later(()=>{ b.style.transform='translate(390px,124px)'; },950);
+  later(()=>{ d.style.transform='scaleX(1)'; },2000);
+  later(()=>{ $('#clock').style.opacity=1; },2500);
+  later(()=>{ $('#clock').style.opacity=0; $('#bN').style.opacity=0; $('#bC').style.opacity=1; },3900);
+  later(()=>{ d.style.transform='scaleX(.1)'; },4300);
+  later(()=>{
+    S.busy=false;
+    const first=S.s0.bottle!==2;
+    S.s0.bottle=2;
+    if(first) fb('info','fbFridge');
+    renderS0(stageEl); checkS0();
+  },5000);
+}
+function bindVars(){
+  const st=S.s0;
+  document.querySelectorAll('.vcard').forEach(c=>{
+    c.onclick=()=>{ st.sel = st.sel===c.dataset.id?null:c.dataset.id; document.querySelectorAll('.vcard').forEach(x=>x.classList.toggle('sel',x.dataset.id===st.sel)); document.querySelectorAll('.slot:not(.filled)').forEach(s=>s.classList.toggle('armed',!!st.sel)); };
+    c.ondragstart=e=>{ e.dataTransfer.setData('text/plain',c.dataset.id); };
+  });
+  document.querySelectorAll('.slot').forEach(s=>{
+    s.onclick=()=>{ if(st.sel) placeVar(st.sel,s.dataset.slot); };
+    s.ondragover=e=>{ if(!s.classList.contains('filled')){ e.preventDefault(); s.classList.add('over'); } };
+    s.ondragleave=()=>s.classList.remove('over');
+    s.ondrop=e=>{ e.preventDefault(); s.classList.remove('over'); placeVar(e.dataTransfer.getData('text/plain'),s.dataset.slot); };
+  });
+}
+function placeVar(id,slot){
+  const st=S.s0, v=VARS.find(x=>x.id===id);
+  if(!v || st.placed[slot]) return;
+  st.sel=null;
+  if(v.slot===slot){ st.placed[slot]=id; fb('ok','fbVarOk',slot); }
+  else fb('warn','fbVarNo',slot);
+  renderS0(stageEl); checkS0();
+  if(v.slot!==slot){ const c=document.querySelector(`.vcard[data-id="${id}"]`); if(c) c.classList.add('shake'); }
+}
+function checkS0(){
+  const st=S.s0;
+  st.done = st.bottle===2 && st.hypSaved && VARS.every(v=>st.placed[v.slot]===v.id);
+  if(st.done) fb('ok','fbS0Done');
+  refresh();
+}
+function guideS0(){
+  const st=S.s0, n=Object.values(st.placed).filter(Boolean).length;
+  return {lead:t('g0lead'),
+    tasks:[[t('g0t1'),st.bottle===2],[t('g0t2'),st.hypSaved],[t('g0t3',n),n===3]],
+    notes:[['help',t('g0hT'),t('g0h')],['help',t('g0nT'),t('g0n')]],
+    redo: st.bottle>0||n>0||st.hypSaved};
+}
+
+/* ===================== STEP 1 : 준비물·안전 ===================== */
+function renderS1(el){
+  const st=S.s1;
+  el.innerHTML=`
+  <div class="card">
+    <h3 class="ch">${t('shelf')} <small>${t('shelfSub')}</small></h3>
+    <div class="shelf">${st.order.map(id=>`<button class="item ${st.got.includes(id)?'gone':''}" data-id="${id}">${icon(id)}<span>${t('it_'+id)}</span></button>`).join('')}</div>
+  </div>
+  <div class="row">
+    <div class="card" style="flex:1.35 1 0">
+      <h3 class="ch">${t('bench')} <small>${st.got.length} / ${NEED_N}</small></h3>
+      <div class="bench">${st.got.length?st.got.map(id=>`<div class="bi ${id===st.lastAdded?'new':''}">${icon(id)}<span>${t('it_'+id)}</span></div>`).join(''):`<span class="empty">${t('benchEmpty')}</span>`}</div>
+    </div>
+    <div class="card" style="flex:1 1 0">
+      <h3 class="ch">${t('ppeTitle')} <small>${st.ppe.length} / ${PPE.length}</small></h3>
+      <div class="ppe-wrap">
+        ${personSVG()}
+        <div class="ppe-btns">${PPE.map(p=>`<button class="sm ${st.ppe.includes(p)?'on':''}" data-ppe="${p}">${st.ppe.includes(p)?'✓ ':''}${t('ppe_'+p)}</button>`).join('')}</div>
+      </div>
+    </div>
+  </div>`;
+  document.querySelectorAll('.item').forEach(b=>b.onclick=()=>{
+    const it=ITEMS.find(i=>i.id===b.dataset.id);
+    if(it.need){ st.got.push(it.id); st.lastAdded=it.id; fb('ok','fbGotId',it.id); renderS1(stageEl); st.lastAdded=null; checkS1(); }
+    else { b.classList.remove('shake'); void b.offsetWidth; b.classList.add('shake'); setFb('warn','fbNoId',it.id); }
+  });
+  document.querySelectorAll('[data-ppe]').forEach(b=>b.onclick=()=>{
+    const id=b.dataset.ppe, i=st.ppe.indexOf(id);
+    if(i>=0){ st.ppe.splice(i,1); fb('info','fbPpeOff'); } else { st.ppe.push(id); fb('ok','fbPpeOnId',id); }
+    renderS1(stageEl); checkS1();
+  });
+}
+// 아이디를 받아 현재 언어의 이름으로 바꿔 주는 피드백
+['ko','en','zh'].forEach(lg=>{
+  L[lg].fbGotId = id => L[lg].fbGot(L[lg]['it_'+id]);
+  L[lg].fbNoId  = id => L[lg].fbNo(L[lg]['it_'+id], L[lg]['why_'+id]);
+  L[lg].fbPpeOnId = id => L[lg].fbPpeOn(L[lg]['ppe_'+id]);
+});
+function personSVG(){
+  const on=id=>S.s1.ppe.includes(id)?'on':'';
+  return `<svg viewBox="0 0 160 220" role="img" aria-label="${t('personAria')}">
+    <rect width="160" height="220" rx="12" fill="#eef2ef"/>
+    <path d="M40 220v-62c0-18 18-28 40-28s40 10 40 28v62z" fill="#5c7f9c"/>
+    <g class="layer ${on('coat')}"><path d="M36 220v-64c0-18 20-28 44-28s44 10 44 28v64z" fill="#fff" stroke="#b9c5ca" stroke-width="2"/><path d="M80 132v88M66 130l14 26 14-26" fill="none" stroke="#b9c5ca" stroke-width="2"/><rect x="92" y="170" width="18" height="14" rx="2" fill="none" stroke="#b9c5ca" stroke-width="2"/></g>
+    <rect x="72" y="104" width="16" height="20" fill="#eebf9a"/>
+    <circle cx="80" cy="78" r="32" fill="#f2c9a5"/>
+    <path d="M48 74c0-22 14-34 32-34s32 12 32 34c-8-10-20-14-32-14s-24 4-32 14z" fill="#3b2f2a"/>
+    <circle cx="68" cy="82" r="3.4" fill="#2c3a43"/><circle cx="92" cy="82" r="3.4" fill="#2c3a43"/>
+    <path d="M72 96q8 6 16 0" stroke="#a5603c" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+    <g class="layer ${on('goggles')}"><path d="M46 76h68" stroke="#3d6f86" stroke-width="4"/><rect x="54" y="70" width="52" height="22" rx="11" fill="rgba(180,225,245,.55)" stroke="#3d6f86" stroke-width="3"/><path d="M80 74v14" stroke="#3d6f86" stroke-width="3"/></g>
+    <circle cx="38" cy="196" r="11" fill="#f2c9a5"/><circle cx="122" cy="196" r="11" fill="#f2c9a5"/>
+    <g class="layer ${on('glove')}"><circle cx="38" cy="196" r="12" fill="#8b6fd6"/><circle cx="122" cy="196" r="12" fill="#8b6fd6"/></g>
+    <g class="layer ${on('heat')}"><path d="M108 210v-20c0-9 6-14 14-14s14 5 14 14v20z" fill="#e8892f" stroke="#a75a17" stroke-width="2"/></g>
+  </svg>`;
+}
+function checkS1(){
+  const st=S.s1;
+  st.done = st.got.length===NEED_N && PPE.every(p=>st.ppe.includes(p));
+  if(st.done) fb('ok','fbS1Done');
+  refresh();
+}
+function guideS1(){
+  const st=S.s1;
+  return {lead:t('g1lead'),
+    tasks:[[t('g1t1',st.got.length,NEED_N),st.got.length===NEED_N],[t('g1t2',st.ppe.length,PPE.length),st.ppe.length===PPE.length]],
+    notes:[['safe',t('safeT'),t('g1safe')]],
+    redo: st.got.length>0||st.ppe.length>0};
+}
+
+/* ===================== STEP 2 : 스포이트 만들기 ===================== */
+const A2={x0:90, s:55, y:212, ry:212, rh:60};
+const C2={x0:90, s:55, y:170};
+function renderS2(el){
+  el.innerHTML=`<div class="card grow">
+    <h3 class="ch" id="s2title"></h3>
+    <div class="scene-box"><svg viewBox="0 0 1000 395" id="s2svg" style="touch-action:none">
+      <defs><clipPath id="magClip"><circle cx="880" cy="96" r="76"/></clipPath></defs>
+      ${tableBg(1000,400)}
+      <g id="s2main"></g>
+    </svg></div>
+    <div class="ctrls" id="s2ctrls"></div>
+  </div>`;
+  drawS2();
+}
+function phaseS2(){ const st=S.s2; return !st.cut?'cut':!st.aligned?'align':!st.tape.every(Boolean)?'tape':'done'; }
+function drawS2(){
+  const st=S.s2, ph=phaseS2(), g=$('#s2main'), svg=$('#s2svg'), ctr=$('#s2ctrls');
+  const tt={cut:['s2cutT','s2cutS'],align:['s2alT','s2alS'],tape:['s2tpT','s2tpS'],done:['s2dnT','s2dnS']}[ph];
+  $('#s2title').innerHTML=`${t(tt[0])} <small>${t(tt[1])}</small>`;
+  if(ph==='cut'){
+    const {x0,s,y}=C2, tipX=x0+15*s;
+    let mini=`<rect x="${tipX-4.3*s}" y="${y+50}" width="${4.6*s}" height="40" rx="4" fill="#f3e6b8" stroke="#c9b67a"/>`;
+    for(let mm=0;mm<=40;mm++){ const X=tipX-mm/10*s, len=mm%10===0?17:mm%5===0?12:7; mini+=`<line x1="${X}" y1="${y+50}" x2="${X}" y2="${y+50+len}" stroke="#5a4a1e" stroke-width="${mm%10===0?1.4:.8}"/>`; if(mm%10===0) mini+=`<text x="${X}" y="${y+84}" text-anchor="middle" font-size="13" font-weight="700" fill="#4a3d17">${mm/10}</text>`; }
+    mini+=`<text x="${tipX-2.1*s}" y="${y+112}" text-anchor="middle" font-size="13" fill="#6d5b2a">${t('fromTip')}</text>`;
+    g.innerHTML=`
+      <text x="${x0}" y="70" font-size="15" fill="#5b6b74">${t('bulb')}</text>
+      <text x="${tipX}" y="70" font-size="15" fill="#5b6b74" text-anchor="end">${t('tip')}</text>
+      <path d="${dropperPath(15,mapH(x0,y,s))}" fill="rgba(230,240,246,.85)" stroke="#7d93a0" stroke-width="2"/>
+      ${mini}
+      <line id="cutGuide" x1="0" y1="${y-55}" x2="0" y2="${y+48}" stroke="#e07a2f" stroke-width="2" stroke-dasharray="5 4" opacity="0"/>
+      <text id="cutLabel" x="0" y="${y-62}" text-anchor="middle" font-size="15" font-weight="700" fill="#c4492a" opacity="0"></text>
+      <g id="scis" opacity="0" pointer-events="none"><g transform="rotate(90) scale(.9)">${ICON.scissors}</g></g>
+      <rect class="hit" id="cutHit" x="${x0+7*s}" y="${y-40}" width="${8.2*s}" height="80" fill="transparent"/>`;
+    const hit=$('#cutHit');
+    const show=e=>{ const p=svgPt(svg,e), d=(tipX-p.x)/s;
+      $('#cutGuide').setAttribute('x1',p.x); $('#cutGuide').setAttribute('x2',p.x); $('#cutGuide').setAttribute('opacity',1);
+      const lb=$('#cutLabel'); lb.setAttribute('x',p.x); lb.textContent=t('cutLbl',Math.max(0,d).toFixed(1)); lb.setAttribute('opacity',1);
+      $('#scis').setAttribute('transform',`translate(${p.x+28},${y-60})`); $('#scis').setAttribute('opacity',1); return d; };
+    hit.onpointermove=show;
+    hit.onpointerleave=()=>{ ['#cutGuide','#cutLabel','#scis'].forEach(q=>$(q).setAttribute('opacity',0)); };
+    hit.onclick=e=>{
+      if(S.busy) return;
+      const d=show(e);
+      if(Math.abs(d-2)<=0.2){
+        S.busy=true;
+        g.innerHTML=`<path d="${dropperPath(13,mapH(x0,y,s))}" fill="rgba(230,240,246,.85)" stroke="#7d93a0" stroke-width="2"/>
+          <path id="tipPiece" class="fall" d="${tipPiecePath(mapH(x0,y,s))}" fill="rgba(230,240,246,.85)" stroke="#7d93a0" stroke-width="2" style="transform-box:fill-box;transform-origin:center"/>
+          <text x="${x0+13*s}" y="${y-40}" text-anchor="middle" font-size="16" font-weight="800" fill="#2c8a57">${t('snip')}</text>`;
+        requestAnimationFrame(()=>requestAnimationFrame(()=>{ const tp=$('#tipPiece'); if(tp){ tp.style.transform='translate(60px,170px) rotate(70deg)'; tp.style.opacity=.2; } }));
+        later(()=>{ S.busy=false; st.cut=true; fb('ok','fbCutOk'); drawS2(); refresh(); },1100);
+      } else setFb('warn','fbCutNo',Math.max(0,d).toFixed(1));
+    };
+    ctr.innerHTML=`<span class="lab">${t('cutHint')}</span>`;
+    return;
+  }
+  const {x0,s,y,ry,rh}=A2;
+  const tapeSpots=[5.5,10.5];
+  g.innerHTML=`
+    <g id="alignScene">
+      ${rulerH(x0,ry,s,15,rh)}
+      <g id="dropAlign" class="${ph==='align'?'drag':''}">
+        <rect id="alHit" x="0" y="${y-50}" width="${13*s}" height="100" fill="transparent"/>
+        <path id="alPath" d="" fill="rgba(230,240,246,.72)" stroke="#6f8794" stroke-width="2"/>
+      </g>
+      ${tapeSpots.map((c,i)=> st.tape[i]
+        ? `<rect x="${x0+c*s-24}" y="${y-26}" width="48" height="60" rx="3" fill="rgba(255,250,215,.6)" stroke="rgba(190,175,120,.9)" transform="rotate(-4 ${x0+c*s} ${y})"/>`
+        : (ph==='tape'?`<g class="tapespot" data-i="${i}"><rect x="${x0+c*s-26}" y="${y-28}" width="52" height="64" rx="4" fill="rgba(224,122,47,.12)" stroke="#e07a2f" stroke-width="2" stroke-dasharray="6 4"/></g>`:'')).join('')}
+    </g>
+    <circle cx="880" cy="96" r="80" fill="#2c3a43"/>
+    <g clip-path="url(#magClip)"><rect x="800" y="16" width="160" height="160" fill="#f1ede4"/><use href="#alignScene" transform="translate(880 96) scale(2.6) translate(${-x0} ${-(ry+26)})"/></g>
+    <circle cx="880" cy="96" r="76" fill="none" stroke="#fff" stroke-width="3"/>
+    <text x="880" y="196" text-anchor="middle" font-size="14" font-weight="700" fill="#2c3a43">${t('magZero')}</text>
+    <text x="${x0}" y="${ry+rh+30}" font-size="16" font-weight="800" fill="#2c8a57" text-anchor="middle" opacity="${st.aligned?1:0}">${t('zeroOk')}</text>
+    ${ph==='done'?`<text x="500" y="370" text-anchor="middle" font-size="16" font-weight="700" fill="#2c8a57">${t('taped')}</text>`:''}`;
+  updateAlign();
+  if(ph==='align'){
+    const dg=$('#dropAlign'); let drag=false, sx=0, so=0;
+    dg.onpointerdown=e=>{ drag=true; dg.setPointerCapture(e.pointerId); sx=svgPt(svg,e).x; so=st.off; };
+    dg.onpointermove=e=>{ if(!drag) return; st.off=clamp(so+(svgPt(svg,e).x-sx)/s,-3,3); updateAlign(); };
+    dg.onpointerup=dg.onpointercancel=()=>{ if(!drag) return; drag=false; if(Math.abs(st.off)<0.15) st.off=0; st.off=r1(st.off); checkAlign(); };
+    ctr.innerHTML=`<span class="lab">${t('nudge')}</span>
+      <button class="sm" data-d="-0.5">◀◀</button><button class="sm" data-d="-0.1">◀ 0.1 cm</button>
+      <button class="sm" data-d="0.1">0.1 cm ▶</button><button class="sm" data-d="0.5">▶▶</button>`;
+    ctr.querySelectorAll('[data-d]').forEach(b=>b.onclick=()=>{ st.off=clamp(r1(st.off+parseFloat(b.dataset.d)),-3,3); updateAlign(); checkAlign(); });
+  } else if(ph==='tape'){
+    g.querySelectorAll('.tapespot').forEach(sp=>sp.onclick=()=>{
+      st.tape[+sp.dataset.i]=true;
+      if(st.tape.every(Boolean)){ st.done=true; fb('ok','fbS2Done'); } else fb('info','fbTape1');
+      drawS2(); refresh();
+    });
+    ctr.innerHTML=`<span class="lab">${t('tapeHint')}</span>`;
+  } else ctr.innerHTML='';
+}
+function updateAlign(){
+  const st=S.s2, {x0,s,y}=A2, p=$('#alPath'); if(!p) return;
+  p.setAttribute('d',dropperPath(13,mapH(x0+st.off*s,y,s)));
+  $('#alHit').setAttribute('x',x0+st.off*s-10);
+}
+function checkAlign(){
+  const st=S.s2;
+  if(Math.abs(st.off)<0.051){ st.off=0; st.aligned=true; fb('ok','fbAlignOk'); drawS2(); refresh(); }
+  else setFb('info','fbAlignNo',st.off>0);
+}
+function guideS2(){
+  const st=S.s2;
+  return {lead:t('g2lead'),
+    tasks:[[t('g2t1'),st.cut],[t('g2t2'),st.aligned],[t('g2t3'),st.tape.every(Boolean)]],
+    notes:[['help',t('helpT'),t('g2help')],['safe',t('safeT'),t('g2safe')]],
+    redo: st.cut};
+}
+
+/* ===================== STEP 3 : 물방울 넣기 ===================== */
+const A3={x0:25, s:33, y:150, rh:40};
+const DEPTH_MAX_TIP=10.05, DEPTH_MIN_TIP=13.3, XROOM_OK=10.6;
+function tipC(depth){ return DEPTH_MIN_TIP-depth/100*(DEPTH_MIN_TIP-DEPTH_MAX_TIP); }
+function assemblyH(x0,y,s,rh,xRoom){
+  const tapes=[5.5,10.5].map(c=>`<rect x="${x0+c*s-0.45*s}" y="${y-0.5*s}" width="${0.9*s}" height="${1.1*s+rh*0.35}" rx="2" fill="rgba(255,250,215,.6)" stroke="rgba(190,175,120,.9)" transform="rotate(-4 ${x0+c*s} ${y})"/>`).join('');
+  const drop = xRoom!=null?`<rect id="drop3" x="${x0+xRoom*s}" y="${y-0.19*s}" width="${DROP*s}" height="${0.38*s}" rx="${0.15*s}" fill="var(--dye)"/>`:'';
+  return `${rulerH(x0,y,s,15,rh)}<path d="${dropperPath(13,mapH(x0,y,s))}" fill="rgba(230,240,246,.72)" stroke="#6f8794" stroke-width="2"/>${drop}${tapes}`;
+}
+function renderS3(el){
+  const st=S.s3, {x0,s,y,rh}=A3;
+  el.innerHTML=`
+  <div class="card">
+    <h3 class="ch" id="s3title"></h3>
+    <svg class="scene" viewBox="0 0 1000 240" id="s3svg">
+      ${tableBg(1000,240)}
+      <g id="asm3">${assemblyH(x0,y,s,rh,st.dropped?st.xRoom:null)}</g>
+      <g id="air3"></g>
+      <g id="d2" style="opacity:${st.filled&&!st.done?1:0};transition:opacity .4s">
+        <path d="${dropperPath(15,(cx,cy)=>[(15-cx)*s,cy*s])}" fill="rgba(240,246,250,.92)" stroke="#6f8794" stroke-width="2"/>
+        <line id="d2liq" x1="0" y1="0" x2="${1.6*s}" y2="0" stroke="var(--dye)" stroke-width="3.2" stroke-linecap="round" opacity="${st.filled&&!st.dropped?1:0}"/>
+      </g>
+      <text id="stuck" x="500" y="60" text-anchor="middle" font-size="15" font-weight="700" fill="#c4492a" opacity="0">${t('stuck')}</text>
+    </svg>
+  </div>
+  <div class="row">
+    <div class="card" style="flex:0 0 200px">
+      <h3 class="ch">${t('dyePrep')}</h3>
+      <svg viewBox="0 0 220 300" style="height:170px;width:auto;display:block;margin:auto" id="fillSvg">
+        <rect width="220" height="300" rx="10" fill="#f1ede4"/>
+        <g id="fd" transform="translate(110,190)">
+          <path d="${dropperPath(15,(cx,cy)=>[cy*12,-(15-cx)*12])}" fill="rgba(240,246,250,.95)" stroke="#6f8794" stroke-width="2"/>
+          <rect id="fliq" x="-1.6" y="${-(st.filled?24:0)}" width="3.2" height="${st.filled?24:0}" fill="var(--dye)"/>
+        </g>
+        ${beakerSVG('cup',110,292,100,80,140,null,0,'rgba(224,58,90,.7)')}
+        <text x="110" y="22" text-anchor="middle" font-size="13" font-weight="700" fill="#5b6b74">${t('dyeWater')}</text>
+      </svg>
+      <div class="ctrls" style="justify-content:center"><button class="primary sm" id="btnFill" ${st.filled?'disabled':''}>${st.filled?t('filledBtn'):t('btnFill')}</button></div>
+    </div>
+    <div class="card" style="flex:1 1 0">
+      <h3 class="ch">${t('dropTitle')}</h3>
+      <div class="range"><span class="lab" style="white-space:nowrap">${t('depthL')}</span><input type="range" id="depth" min="0" max="100" value="${st.depth}" aria-label="${esc(t('depthL'))}" ${(!st.filled||st.dropped)?'disabled':''}></div>
+      <div class="ctrls">
+        <button class="warm" id="btnDrop" ${(!st.filled||st.dropped)?'disabled':''}>${t('btnDrop')}</button>
+        <button id="btnRetry" ${st.dropped&&!st.done?'':'hidden'}>${t('btnRetry')}</button>
+      </div>
+      <p style="font-size:14px;color:#5b6b74;margin:10px 0 0">${t('s3info')}</p>
+    </div>
+  </div>`;
+  drawS3();
+  $('#btnFill').onclick=doFill;
+  $('#depth').oninput=e=>{ st.depth=+e.target.value; drawS3(); };
+  $('#btnDrop').onclick=doDrop;
+  $('#btnRetry').onclick=()=>{ st.dropped=false; st.xRoom=null; st.done=false; st.depth=0; invalidate('s3'); fb('info','fbRetry'); renderS3(stageEl); refresh(); };
+}
+function drawS3(){
+  const st=S.s3, {x0,s,y}=A3;
+  const tt=!st.filled?['s3t1','s3s1']:!st.dropped?['s3t2','s3s2']:st.done?['s3t3','s3s3']:['s3t4','s3s4'];
+  $('#s3title').innerHTML=`${t(tt[0])} <small>${t(tt[1])}</small>`;
+  $('#d2').setAttribute('transform',`translate(${x0+tipC(st.depth)*s},${y})`);
+  $('#stuck').setAttribute('opacity', st.filled&&!st.dropped&&st.depth>=100?1:0);
+  const air=$('#air3');
+  if(st.dropped && st.xRoom!=null){
+    const xe=x0+st.xRoom*s;
+    air.innerHTML=`<path d="M${x0+2},${y+0.95*s} v8 H${xe-2} v-8" fill="none" stroke="#1f7a8c" stroke-width="2"/>
+      <text x="${(x0+xe)/2}" y="${y+0.95*s+28}" text-anchor="middle" font-size="15" font-weight="700" fill="#1f7a8c">${t('airLbl')}</text>
+      <text x="${xe+DROP*s/2}" y="${y-0.8*s}" text-anchor="middle" font-size="14" font-weight="700" fill="#c0304d">${t('dropLbl')}</text>`;
+  } else air.innerHTML='';
+}
+function doFill(){
+  const st=S.s3; if(S.busy||st.filled) return; S.busy=true;
+  const fd=$('#fd'), fl=$('#fliq');
+  tween(700,e=>fd.setAttribute('transform',`translate(110,${190+60*e})`),()=>{
+    tween(700,e=>{ fl.setAttribute('height',24*e); fl.setAttribute('y',-24*e); },()=>{
+      tween(700,e=>fd.setAttribute('transform',`translate(110,${250-60*e})`),()=>{
+        S.busy=false; st.filled=true; fb('ok','fbFilled'); renderS3(stageEl); refresh();
+      });
+    });
+  });
+}
+function doDrop(){
+  const st=S.s3; if(S.busy||!st.filled||st.dropped) return; S.busy=true;
+  const {x0,s,y}=A3, tc=tipC(st.depth);
+  const xr=Math.round((tc-DROP)*100)/100;
+  $('#asm3').insertAdjacentHTML('beforeend',`<rect id="drop3" x="${x0+xr*s}" y="${y-0.19*s}" width="0" height="${0.38*s}" rx="${0.15*s}" fill="var(--dye)"/>`);
+  const d=$('#drop3');
+  $('#d2liq').setAttribute('opacity',0);
+  tween(450,e=>{ d.setAttribute('width',DROP*s*e); d.setAttribute('x',x0+(tc-DROP*e)*s); },()=>{
+    st.dropped=true; st.xRoom=xr;
+    if(xr<=XROOM_OK){
+      tween(700,e=>{ $('#d2').setAttribute('transform',`translate(${x0+(tc+(DEPTH_MIN_TIP+0.6-tc)*e)*s},${y})`); },()=>{
+        S.busy=false; st.done=true; fb('ok','fbDropOk'); renderS3(stageEl); refresh();
+      });
+    } else { S.busy=false; st.done=false; fb('warn','fbDropFar'); renderS3(stageEl); refresh(); }
+  });
+}
+function guideS3(){
+  const st=S.s3;
+  return {lead:t('g3lead'),
+    tasks:[[t('g3t1'),st.filled],[t('g3t2'),st.dropped?st.xRoom<=XROOM_OK:st.depth>=100],[t('g3t3'),st.done]],
+    notes:[['help',t('helpT'),t('g3help')]],
+    redo: st.filled};
+}
+
+/* ===================== STEP 4 : 온도가 다른 물 만들기 ===================== */
+const B4={xs:[260,420,580,740], base:390, w:120, h:170};
+function mixTemp(hot){ const mix=(5*(150-hot)+70*hot)/150; return r1(mix-0.05*(mix-ROOM)+rnd(-0.3,0.3)); }
+function renderS4(el){
+  const st=S.s4, {xs,base,w,h}=B4;
+  el.innerHTML=`
+  <div class="card">
+    <h3 class="ch">${t('s4T')} <small>${t('s4S')}</small><button class="primary sm" id="btnCheck4" style="margin-left:auto" ${st.b.every(b=>b.poured)?'':'disabled'}>${t('check4')}</button></h3>
+    <svg class="scene" viewBox="0 130 1000 310" id="s4svg">
+      ${tableBg(1000,440)}
+      <g transform="translate(40,230) scale(2.1)">${ICON.cold}</g>
+      <text x="107" y="392" text-anchor="middle" font-size="15" font-weight="700" fill="#1f6ea0">${t('cold')}</text>
+      <g transform="translate(828,230) scale(2.1)">${ICON.hot}</g>
+      <text x="895" y="392" text-anchor="middle" font-size="15" font-weight="700" fill="#c4492a">${t('hot')}</text>
+      <text x="895" y="222" text-anchor="middle" font-size="12" font-weight="700" fill="#c4492a">${t('burn')}</text>
+      ${xs.map((x,i)=>{ const b=st.b[i]; return `
+        <g class="steam" style="display:${b.poured&&b.temp>36?'':'none'}">
+          <path d="M${x-20},${base-h-6} q-8,-12 0,-24 q8,-12 0,-24" stroke="#c9d3d8" stroke-width="3" fill="none"/>
+          <path d="M${x},${base-h-6} q-8,-12 0,-24 q8,-12 0,-24" stroke="#c9d3d8" stroke-width="3" fill="none"/>
+          <path d="M${x+20},${base-h-6} q-8,-12 0,-24 q8,-12 0,-24" stroke="#c9d3d8" stroke-width="3" fill="none"/>
+        </g>
+        <rect id="stream${i}" x="${x-3}" y="${base-h-50}" width="6" height="0" rx="3" fill="#7fb8dd"/>
+        ${beakerSVG('b4_'+i,x,base,w,h,b.poured?150:0,b.temp,i+1)}`; }).join('')}
+    </svg>
+    <div class="mix-grid">
+      ${st.b.map((b,i)=>{ const fi=b.poured?feelIdx(b.temp):-1; return `
+        <div class="mix">
+          <h4>${t('beakerN',i+1)} <span class="feel" style="color:${fi>=0?FEEL_COL[fi]:'#999'}">${fi>=0?t('feelPre')+t('feel')[fi]:''}</span></h4>
+          <div class="amt"><span class="h">${t('hot')} <b>${b.hot}</b> mL</span> + <span class="c">${t('cold')} <b>${150-b.hot}</b> mL</span></div>
+          <input type="range" min="0" max="150" step="10" value="${b.hot}" data-i="${i}" ${b.poured?'disabled':''} aria-label="${esc(t('ariaHot',i+1))}">
+          ${b.poured?`<button class="sm" data-dump="${i}">${t('dump')}</button>`:`<button class="sm primary" data-pour="${i}">${t('pour')}</button>`}
+        </div>`; }).join('')}
+    </div>
+  </div>`;
+  el.querySelectorAll('input[type=range]').forEach(r=>r.oninput=()=>{ const i=+r.dataset.i; st.b[i].hot=+r.value; const box=r.closest('.mix'); box.querySelector('.h b').textContent=st.b[i].hot; box.querySelector('.c b').textContent=150-st.b[i].hot; });
+  el.querySelectorAll('[data-pour]').forEach(b=>b.onclick=()=>pour(+b.dataset.pour));
+  el.querySelectorAll('[data-dump]').forEach(b=>b.onclick=()=>{
+    const i=+b.dataset.dump, had=s5HasData();
+    st.b[i].poured=false; st.b[i].temp=null; st.done=false; invalidate('s4');
+    fb('info','fbDump',i+1,had); renderS4(stageEl); refresh();
+  });
+  $('#btnCheck4').onclick=check4;
+}
+function pour(i){
+  const st=S.s4; if(S.busy) return; S.busy=true;
+  const {xs,base,w,h}=B4, x=xs[i], b=st.b[i];
+  const l=x-w/2, r=x+w/2;
+  const T=mixTemp(b.hot), cold=150-b.hot;
+  const wp=$('#b4_'+i+'w'), sr=$('#stream'+i);
+  const yTop=base-h-50, totalDur=1700, coldDur=totalDur*cold/150;
+  const seg=(dur,from,to,col,colorAt,next)=>{
+    if(dur<=0){ next(); return; }
+    sr.setAttribute('fill',col);
+    tween(dur,e=>{ const v=from+(to-from)*e; wp.setAttribute('d',waterPath(l,r,base,h,v)); wp.setAttribute('fill',waterColor(colorAt(e))); const sy=base-3-v/250*(h-14); sr.setAttribute('height',Math.max(0,sy-yTop)); },next);
+  };
+  wp.setAttribute('fill',waterColor(5));
+  seg(coldDur,0,cold,'#7fb8dd',()=>5,()=>{
+    seg(totalDur-coldDur,cold,150,'#f0a06a',e=>5+(T-5)*e,()=>{
+      sr.setAttribute('height',0);
+      b.poured=true; b.temp=T; st.done=false; invalidate('s4');
+      S.busy=false; fb('info','fbPour',i+1); renderS4(stageEl); refresh();
+    });
+  });
+}
+function check4(){
+  const st=S.s4, tp=st.b.map(b=>b.temp);
+  for(let i=0;i<4;i++) if(tp[i]>50) return setFb('warn','fb4Hot',i+1);
+  for(let i=1;i<4;i++){
+    if(tp[i]<=tp[i-1]) return setFb('warn','fb4Order',i+1);
+    if(tp[i]-tp[i-1]<5) return setFb('warn','fb4Gap',i+1);
+  }
+  st.done=true; fb('ok','fbS4Done'); refresh();
+}
+function guideS4(){
+  const st=S.s4, n=st.b.filter(b=>b.poured).length;
+  return {lead:t('g4lead'),
+    tasks:[[t('g4t1',n),n===4],[t('g4t2'),st.done]],
+    notes:[['help',t('helpT'),t('g4help')],['safe',t('safeT'),t('g4safe')]],
+    redo: n>0};
+}
+
+/* ===================== STEP 5 : 측정·기록 ===================== */
+const B5={xs:[170,390,610,830], base:530, w:150, h:200, s:20};
+const Y_IN=518, Y_UP=318, MC=115;   // MC: 돋보기 속 물방울 아래쪽 기준선 높이
+function asmX(i){ return B5.xs[i]-8; }
+function curIdx(){ return S.s5.rows.findIndex(r=>!r.ok); }
+function renderS5(el){
+  const st=S.s5, {xs,base,w,h,s}=B5;
+  if(st.Y==null) st.Y=Y_UP;
+  if(st.ins) st.Y=Y_IN; else if(st.Y!==Y_UP) st.Y=Y_UP;   // 언어 전환 등으로 애니메이션이 끊겼을 때 위치 정리
+  const t4=S.s4.b.map(b=>b.temp);
+  let ticks='';
+  for(let mm=0;mm<=150;mm++){ const Y=-mm/10*s, len=mm%10===0?10:mm%5===0?7:4; ticks+=`<line x1="0" y1="${Y}" x2="${len}" y2="${Y}" stroke="#5a4a1e" stroke-width="${mm%10===0?1:.6}"/>`; if(mm%10===0&&mm>0) ticks+=`<text x="12" y="${Y+3}" font-size="7.5" fill="#4a3d17" font-weight="700">${mm/10}</text>`; }
+  const vmap=(cx,cy)=>[-17+cy*s,-cx*s];
+  let mt='';
+  for(let mm=0;mm<=150;mm++){const Y=-mm/10*70,len=mm%10===0?44:mm%5===0?30:18;mt+=`<line x1="120" y1="${Y}" x2="${120+len}" y2="${Y}" stroke="#4a3d17" stroke-width="${mm%10===0?2.2:1.2}"/>`;if(mm%10===0)mt+=`<text x="170" y="${Y+7}" font-size="20" font-weight="800" fill="#3d3212">${mm/10}</text>`;}
+  el.innerHTML=`
+  <div class="card grow">
+    <h3 class="ch">${t('s5T')} <small>${t('s5S')}</small></h3>
+    <div class="scene-box"><svg viewBox="0 0 1000 570" id="s5svg">
+      <defs><pattern id="tile" width="50" height="50" patternUnits="userSpaceOnUse"><rect width="50" height="50" fill="#eef0ea"/><path d="M50 0H0V50" fill="none" stroke="#dde2da" stroke-width="2"/></pattern></defs>
+      <rect width="1000" height="570" fill="url(#tile)"/>
+      <rect y="300" width="1000" height="270" fill="#f1ede4"/>
+      <rect y="292" width="1000" height="10" fill="#cfc4b0"/>
+      <rect y="544" width="1000" height="26" fill="#ddd4c3"/>
+      ${xs.map((x,i)=>`<g class="bk" data-i="${i}" style="cursor:pointer">${beakerSVG('b5_'+i,x,base,w,h,150,t4[i],i+1)}</g>`).join('')}
+      <g id="asm" transform="translate(${asmX(st.at)},${st.Y})">
+        <rect x="0" y="${-15.4*s}" width="30" height="${15.8*s}" rx="2" fill="#f3e6b8" stroke="#c9b67a"/>
+        ${ticks}
+        <path d="${dropperPath(13,vmap)}" fill="rgba(235,243,248,.8)" stroke="#6f8794" stroke-width="1.6"/>
+        <rect id="drop5" x="${-17-0.19*s}" y="0" width="${0.38*s}" height="${DROP*s}" rx="2.5" fill="var(--dye)"/>
+        <rect x="-32" y="${-5.9*s}" width="64" height="${0.8*s}" fill="rgba(255,250,215,.65)" stroke="rgba(190,175,120,.9)"/>
+        <rect x="-32" y="${-10.9*s}" width="64" height="${0.8*s}" fill="rgba(255,250,215,.65)" stroke="rgba(190,175,120,.9)"/>
+        <rect x="46" y="-205" width="5" height="195" rx="2.5" fill="#b8c4ca" stroke="#7d93a0"/>
+        <rect x="30" y="-262" width="38" height="58" rx="6" fill="#33424b"/>
+        <rect x="34" y="-254" width="30" height="16" rx="2" fill="#a9c3a1"/>
+        <text id="tmini" x="62" y="-242" text-anchor="end" font-size="10" font-family="monospace" font-weight="700" fill="#1d2a1b">20.0</text>
+      </g>
+      <g transform="translate(696,22)">
+        <rect width="280" height="126" rx="12" fill="#33424b"/>
+        <text x="14" y="22" font-size="13.5" font-weight="700" fill="#d6e2df">${t('thermo')}</text>
+        <rect x="14" y="31" width="252" height="62" rx="6" fill="#a9c3a1"/>
+        <text id="lcdVal" x="228" y="79" text-anchor="end" font-size="44" font-weight="700" font-family="Consolas,'DejaVu Sans Mono',monospace" fill="#1d2a1b">20.0</text>
+        <text x="233" y="79" font-size="18" font-weight="700" fill="#1d2a1b">℃</text>
+        <circle id="lcdDot" cx="20" cy="110" r="5" fill="#9aa7a1"/>
+        <text id="lcdState" x="32" y="115" font-size="13" font-weight="700" fill="#e9f0ee">${t('inAir')}</text>
+      </g>
+      <text x="976" y="168" text-anchor="end" font-size="12.5" fill="#5b6b74">${t('roomT')} 20 ℃</text>
+    </svg></div>
+    <div class="scene-btns" id="s5btns"></div>
+  </div>
+  <div class="meas">
+    <div class="card mag">
+      <div class="ttl">${t('mag')}</div>
+      <svg viewBox="0 0 240 230" id="magSvg">
+        <defs><clipPath id="mclip"><rect x="8" y="8" width="224" height="214" rx="16"/></clipPath></defs>
+        <rect x="4" y="4" width="232" height="222" rx="18" fill="#2c3a43"/>
+        <g clip-path="url(#mclip)">
+          <rect x="8" y="8" width="224" height="214" fill="#f6f2e8"/>
+          <rect x="120" y="0" width="112" height="230" fill="#f3e6b8"/>
+          <g id="mticks">${mt}</g>
+          <rect x="60" y="0" width="44" height="230" fill="rgba(225,238,245,.9)"/>
+          <line x1="60" y1="0" x2="60" y2="230" stroke="#6f8794" stroke-width="3"/>
+          <line x1="104" y1="0" x2="104" y2="230" stroke="#6f8794" stroke-width="3"/>
+          <path d="M62,${MC} Q82,${MC-8} 102,${MC} L102,${MC-DROP*70} Q82,${MC-DROP*70-7} 62,${MC-DROP*70} Z" fill="var(--dye)"/>
+          <text x="82" y="${MC-DROP*70-12}" text-anchor="middle" font-size="12" font-weight="700" fill="#c0304d">${t('dropLbl')}</text>
+          <g id="mhint" style="display:none">
+            <line x1="40" y1="${MC}" x2="200" y2="${MC}" stroke="#c4492a" stroke-width="2.5" stroke-dasharray="6 4"/>
+            <rect x="14" y="${MC+10}" width="100" height="22" rx="4" fill="rgba(255,255,255,.88)"/>
+            <text x="20" y="${MC+26}" font-size="13" font-weight="800" fill="#c4492a">${t('bottom')}</text>
+          </g>
+        </g>
+      </svg>
+    </div>
+    <div class="card table-card">
+      <div class="ttl" style="margin-bottom:4px">${t('tableT')} <span>· ${t('decimal')}</span></div>
+      <table class="data">
+        <thead><tr><th>${t('thNo')}</th><th>${t('thT')}</th><th>${t('thX')}</th><th></th></tr></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+  </div>`;
+  el.querySelectorAll('.bk').forEach(g=>g.onclick=()=>{ const i=+g.dataset.i; if(i===curIdx()&&!st.ins) insertTo(i); });
+  drawS5Controls(); drawTable(); drawDone();
+  startLoop();
+}
+function drawS5Controls(){
+  const st=S.s5, c=curIdx(), box=$('#s5btns'); if(!box) return;
+  if(c<0){ box.innerHTML=st.ins?`<button id="bOut">${t('btnOutAll')}</button><span style="color:#2c8a57;font-weight:700">${t('measDone')}</span>`:`<span style="color:#2c8a57;font-weight:700">${t('allDone')}</span>`; }
+  else if(st.ins){ box.innerHTML=`<button id="bOut">${t('btnOut',st.at+1)}</button><span style="font-size:14px;color:#5b6b74">${t('outHint')}</span>`; }
+  else { box.innerHTML=`<button class="primary" id="bIn">${t('btnIn',c+1)}</button><span style="font-size:14px;color:#5b6b74">${t('inHint')}</span>`; }
+  const bi=$('#bIn'), bo=$('#bOut');
+  if(bi) bi.onclick=()=>insertTo(c);
+  if(bo) bo.onclick=takeOut;
+}
+function insertTo(i){
+  const st=S.s5; if(S.busy) return; S.busy=true;
+  const g=$('#asm'), x0=asmX(st.at), x1=asmX(i);
+  const goDown=()=>{ tween(800,e=>{ st.Y=Y_UP+(Y_IN-Y_UP)*e; g.setAttribute('transform',`translate(${x1},${st.Y})`); },()=>{
+    st.ins=true; S.busy=false; fb('info','fbIn',i+1); drawS5Controls(); drawTable(); refresh(); }); };
+  if(x0!==x1) tween(700,e=>{ g.setAttribute('transform',`translate(${x0+(x1-x0)*e},${st.Y})`); },()=>{ st.at=i; goDown(); });
+  else { st.at=i; goDown(); }
+}
+function takeOut(){
+  const st=S.s5; if(S.busy) return; S.busy=true; st.ins=false;
+  const g=$('#asm'), x=asmX(st.at);
+  tween(700,e=>{ st.Y=Y_IN-(Y_IN-Y_UP)*e; g.setAttribute('transform',`translate(${x},${st.Y})`); },()=>{
+    const c=curIdx();
+    if(c>=0 && c!==st.at){ const x1=asmX(c); tween(700,e=>g.setAttribute('transform',`translate(${x+(x1-x)*e},${st.Y})`),()=>{ st.at=c; S.busy=false; drawS5Controls(); drawTable(); refresh(); }); }
+    else { S.busy=false; drawS5Controls(); drawTable(); refresh(); }
+  });
+}
+function stable(){ const st=S.s5, Tw=S.s4.b[st.at].temp; return st.ins && Math.abs(st.Tp-Tw)<0.04 && Math.abs(st.Tair-Tw)<0.04; }
+function startLoop(){
+  let last=performance.now(), alive=true;
+  function f(now){
+    if(!alive) return;
+    const dt=Math.min(0.1,(now-last)/1000); last=now;
+    const st=S.s5, Tw=S.s4.b[st.at].temp;
+    const env=st.ins?Tw:ROOM;
+    st.Tair += (env-st.Tair)*(1-Math.exp(-dt/(st.ins?1.2:30)));
+    st.Tp   += (env-st.Tp)*(1-Math.exp(-dt/(st.ins?0.8:8)));
+    const x=dropPos(st.Tair,S.s3.xRoom);
+    const d=$('#drop5'); if(d) d.setAttribute('y',-(x+DROP)*B5.s);
+    const tv=st.Tp.toFixed(1);
+    const tm=$('#tmini'); if(tm) tm.textContent=tv;
+    const lv=$('#lcdVal'); if(lv) lv.textContent=tv;
+    const ls=$('#lcdState'), dot=$('#lcdDot');
+    if(ls){ const sb=stable(); ls.textContent=st.ins?(sb?t('stableTxt'):t('changing')):t('inAir'); dot.setAttribute('fill',st.ins?(sb?'#3fbf7a':((now/300|0)%2?'#f0a050':'#6b5a48')):'#9aa7a1'); }
+    const mtk=$('#mticks'); if(mtk) mtk.setAttribute('transform',`translate(0,${MC+x*70})`);
+    requestAnimationFrame(f);
+  }
+  requestAnimationFrame(f);
+  rafs.push(()=>{alive=false;});
+}
+function drawTable(){
+  const st=S.s5, tb=$('#tbody'); if(!tb) return;
+  const c=curIdx();
+  tb.innerHTML=st.rows.map((r,i)=>{
+    const active=i===c && st.ins && st.at===i;
+    return `<tr class="${r.ok?'ok':active?'active':''}">
+      <td><span class="num">${i+1}</span></td>
+      <td><input inputmode="decimal" data-k="t" data-i="${i}" value="${esc(r.t)}" ${r.ok||!active?'disabled':''} placeholder="${active?'℃':''}" aria-label="${esc(t('ariaT',i+1))}"></td>
+      <td><input inputmode="decimal" data-k="x" data-i="${i}" value="${esc(r.x)}" ${r.ok||!active?'disabled':''} placeholder="${active?'cm':''}" aria-label="${esc(t('ariaX',i+1))}"></td>
+      <td>${r.ok?'<span style="color:#2c8a57;font-weight:800">✓</span>':active?`<button class="sm primary" data-rec="${i}">${t('rec')}</button>`:''}</td>
+    </tr>`;
+  }).join('');
+  tb.querySelectorAll('input').forEach(inp=>{
+    inp.oninput=()=>{ st.rows[+inp.dataset.i][inp.dataset.k]=inp.value.trim(); };
+    inp.onkeydown=e=>{ if(e.key==='Enter') record(+inp.dataset.i); };
+  });
+  tb.querySelectorAll('[data-rec]').forEach(b=>b.onclick=()=>record(+b.dataset.rec));
+  const mh=$('#mhint'); if(mh) mh.style.display = (c>=0 && st.rows[c].tries>=2)?'':'none';
+}
+function record(i){
+  const st=S.s5, r=st.rows[i];
+  if(!stable()) return setFb('warn','fbNotStable');
+  const Tw=S.s4.b[i].temp, xTrue=dropPos(Tw,S.s3.xRoom);
+  const tv=parseFloat(r.t.replace(',','.')), xv=parseFloat(r.x.replace(',','.'));
+  if(isNaN(tv)||isNaN(xv)) return setFb('warn','fbNaN');
+  const tOk=Math.abs(tv-Tw)<=0.1+1e-9, xOk=Math.abs(xv-xTrue)<=0.1+1e-9;
+  if(tOk&&xOk){
+    r.ok=true; r.t=tv.toFixed(1); r.x=xv.toFixed(1);
+    if(st.rows.every(q=>q.ok)){ st.done=true; fb('ok','fbRecAll'); }
+    else fb('ok','fbRec',i+1);
+  } else {
+    r.tries++;
+    fb('warn','fbBad',!tOk,!xOk,r.tries>=2);
+  }
+  drawS5Controls(); drawTable(); drawDone(); refresh();
+}
+['ko','en','zh'].forEach(lg=>{
+  L[lg].fbBad=(bt,bx,second)=>[bt?L[lg].fbBadT:'', bx?(second?L[lg].fbBadX2:L[lg].fbBadX):''].filter(Boolean).join(' ');
+});
+function resultText(){ return `${t('thNo')}\t${t('thT')}\t${t('thX')}\n`+S.s5.rows.map((r,i)=>`${i+1}\t${r.t}\t${r.x}`).join('\n'); }
+function drawDone(){
+  const box=$('#s5done'); if(!box) return;
+  if(!S.s5.done){ box.innerHTML=''; return; }
+  const hyp=S.s0.hyp;
+  box.innerHTML=`<div class="done-card">
+    <h3>${t('doneT')}</h3>
+    ${hyp?`<div class="hyp-review"><b>${t('myHyp')}</b>${esc(hyp)}<div style="font-size:13.5px;color:#7a6047;margin-top:4px">${t('compare')}</div></div>`:''}
+    <p style="margin:0 0 6px">${t('doneP')}</p>
+    <div class="ctrls" style="margin-top:4px;gap:6px"><button class="primary sm" id="bCopy">${t('copy')}</button><button class="sm" id="bPrint">${t('print')}</button><span id="copyMsg" style="font-size:14px;color:#2c8a57;font-weight:700"></span></div>
+  </div>`;
+  $('#bCopy').onclick=()=>{
+    const txt=resultText();
+    const ok=()=>$('#copyMsg').textContent=t('copied');
+    if(navigator.clipboard&&window.isSecureContext) navigator.clipboard.writeText(txt).then(ok,()=>fallbackCopy(txt,ok));
+    else fallbackCopy(txt,ok);
+  };
+  $('#bPrint').onclick=()=>{
+    $('#printArea').innerHTML=`<h2>${t('printTitle')}</h2><p>${t('printName')}</p>
+      ${hyp?`<p><b>${t('myHyp')}:</b> ${esc(hyp)}</p>`:''}
+      <table><tr><th>${t('thNo')}</th><th>${t('thT')}</th><th>${t('thX')}</th></tr>${S.s5.rows.map((r,i)=>`<tr><td>${i+1}</td><td>${esc(r.t)}</td><td>${esc(r.x)}</td></tr>`).join('')}</table>`;
+    window.print();
+  };
+}
+function fallbackCopy(txt,ok){ const ta=document.createElement('textarea'); ta.value=txt; document.body.appendChild(ta); ta.select(); try{document.execCommand('copy'); ok();}catch(e){} ta.remove(); }
+function guideS5(){
+  const st=S.s5;
+  return {lead:t('g5lead'),
+    tasks:st.rows.map((r,i)=>[t('g5t',i+1),r.ok]),
+    notes:[['help',t('g5orderT'),t('g5order')],['help',t('helpT'),t('g5help')],['safe',t('safeT'),t('g5safe')]],
+    redo: st.rows.some(r=>r.ok)};
+}
+
+/* ===================== 단계 목록 & 시작 ===================== */
+const STEPS=[
+  {render:renderS0, guide:guideS0},
+  {render:renderS1, guide:guideS1},
+  {render:renderS2, guide:guideS2},
+  {render:renderS3, guide:guideS3},
+  {render:renderS4, guide:guideS4},
+  {render:renderS5, guide:guideS5}
+];
+render(false);
+</script>
+</body>
+</html>
